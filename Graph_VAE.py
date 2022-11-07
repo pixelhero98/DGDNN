@@ -1,9 +1,7 @@
 import torch; torch.manual_seed(0)
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils
 import torch.distributions
-import torchvision
 import numpy as np
 
 
@@ -20,10 +18,9 @@ class VariationalEncoder(nn.Module):
         self.kl = 0
 
     def forward(self, x):
-        x = torch.flatten(x, start_dim=1)
         x = F.relu(self.linear1(x))
-        mu =  self.linear2(x)
-        sigma = torch.exp(self.linear3(x))
+        mu =  self.linear2(x).cuda()
+        sigma = torch.exp(self.linear3(x)).cuda()
         z = mu + sigma*self.N.sample(mu.shape)
         self.kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
         return z
@@ -34,24 +31,26 @@ class VariationalEncoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, latent_dims, hidden_dims, output_dims):
         super(Decoder, self).__init__()
-        self.linear1 = nn.Linear(latent_dims, hidden_dims)
-        self.linear2 = nn.Linear(hidden_dims, output_dims)
+        self.linear1 = nn.Linear(latent_dims, hidden_dims).cuda()
+        self.linear2 = nn.Linear(hidden_dims, output_dims).cuda()
 
-    def forward(self, z):
-        z = F.relu(self.linear1(z))
+    def forward(self, x):
+        z = F.relu(self.linear1(x)).cuda()
+        z = self.linear2(z).cuda()
         return z
 
 
 
-class G_vae(nn.Module):
+
+class Vae(nn.Module):
     def __init__(self, input_dims, hidden_dims0, latent_dims, hidden_dims1, output_dims):
-        super(G_vae, self).__init__()
+        super(Vae, self).__init__()
         self.encoder = VariationalEncoder(input_dims, hidden_dims0, latent_dims)
         self.decoder = Decoder(latent_dims, hidden_dims1, output_dims)
 
     def forward(self, x):
-        z = self.encoder(input_dims=x.shape[1], hidden_dims0=2048, latent_dims=512)
-        z = self.decoder(latent_dims=512, hidden_dims1=1024, output_dims=x.shape[0])
+        z = self.encoder(x)
+        z = self.decoder(z)
         return z
     def reset_parameters(self):
         self.encoder.reset_parameters()

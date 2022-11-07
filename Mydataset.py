@@ -11,22 +11,23 @@ from torch import Tensor
 from typing import Optional, Tuple
 import random
 from Cross_Attention_Score import cross_attention_score
-
+from path_config import path, target_comps_path
 
 
 
 def node_feature_generation(X1):
-    path = r'/content/drive/MyDrive/Colab Notebooks/MY_Stock_Data'
+    path0 = path()
+    target_path = target_comps_path()
     comlist = []
-    with open('/content/drive/MyDrive/Colab Notebooks/NASDAQ_tickers_qualify_dr-0.98_min-5_smooth.csv') as k:
+    with open(target_comps_path) as k:
         ks = csv.reader(k)
         for line in ks:
             comlist.append(line[0])
 
     for h in comlist:
         x = []
-        for items in os.listdir(path):
-            d_path = path + '/' + items
+        for items in os.listdir(path0):
+            d_path = path0 + '/' + items
             if 'NASDAQ_' + h + '_30Y' == items[:-4]:
                 with open(d_path) as f:
                     file = csv.reader(f)
@@ -97,7 +98,7 @@ class MyOwnDataset(InMemoryDataset):
 
         X1 = node_feature_generation(X1=[])
 
-        Edge_index, Edge_attr = edge_info_generation(X1)
+        Edge_index, Edge_attr = edge_info_generation(X1, path, )
 
         Edge_attr = Edge_attr.reshape(Edge_attr.shape[0], 1)
 
