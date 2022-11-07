@@ -21,9 +21,6 @@ def get_edge_feature(x, sparse_heat_matrix):
 
     return torch.cat((residual_matrix, x), dim=1)
 
-def mult_edge_gat_conv(edge, gat):
-
-    return math.sqrt(edge * gat)
 
 class my_edge_conv(nn.Module):
     def __init__(self, input_dims, hidden_dims, output_dims):
