@@ -133,6 +133,3 @@ def rand_seed_generation(sum):
         np.random.seed(random.sample(range(0, 9000), 1))
         p0 = np.random.rand(1)
     return p0
-
-
-def train_mask_generation():

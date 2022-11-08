@@ -21,6 +21,9 @@ def default_args():
     parser.add_argument('--epsilon_clipped', type=float, default=0.001)
     parser.add_argument('--top_k', type=int, default=64)
     parser.add_argument('--prob', type=float, default=0.333)
-    parser.parse_args()
+    parser.add_argument('--train', type=str, default='train_data')
+    parser.add_argument('--val', type=str, default='val_data')
+    parser.add_argument('--test', type=str, default='test_data')
+    parser.add_argument('--model_save', type=str, default='model_save')
 
     return parser.parse_args()
