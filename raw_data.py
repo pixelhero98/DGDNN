@@ -9,12 +9,67 @@ from Cross_Attention_Score import cross_attention_score
 from path_config import path, target_comps_path
 
 
+def check_years(line, years):
+    for year in years:
+        if line == year:
+            return 1
 
-def node_feature_generation(X1):
 
+def check_label(x):
+    if x[0] == 0:
+        return x[-2] / x[5] - 1
+    else:
+        return x[-2] / x[0] - 1
+
+
+def label_generation(labels):
+    label = []
+    for i in labels:
+        if i >= -0.01 and i <= 0.01:
+            label.append(list([0,0,0,0]))
+        elif i >= -0.15 and i < -0.01:
+            label.append(list([0,0,0,1]))
+        elif i >= -0.29 and i < -0.15:
+            label.append(list([0,0,1,0]))
+        elif i >= -0.43 and i < -0.29:
+            label.append(list([0,0,1,1]))
+        elif i >= -0.57 and i < -0.43:
+            label.append(list([0,1,0,0]))
+        elif i >= -0.71 and i < -0.57:
+            label.append(list([0,1,0,1]))
+        elif i >= -0.85 and i < -0.71:
+            label.append(list([0,1,1,0]))
+        elif i < -0.85:
+            label.append(list([0,1,1,1]))
+        elif i > 0.01 and i <= 0.15:
+            label.append(list([1,0,0,0]))
+        elif i > 0.15 and i <= 0.29:
+            label.append(list([1,0,0,1]))
+        elif i > 0.29 and i <= 0.43:
+            label.append(list([1,0,1,0]))
+        elif i > 0.43 and i <= 0.57:
+            label.append(list([1,0,1,1]))
+        elif i > 0.57 and i <= 0.71:
+            label.append(list([1,1,0,0]))
+        elif i > 0.71 and i <= 0.85:
+            label.append(list([1,1,0,1]))
+        elif i > 0.85 and i <= 0.99:
+            label.append(list([1,1,1,0]))
+        else:
+            label.append(list([1,1,1,1]))
+
+    return torch.Tensor(label)
+
+
+def node_feature_label_generation(X1, start, end):
     data_path = path()
     target_comps_path_0 = target_comps_path()
     comlist = []
+    years = []
+    labels = []
+
+    for i in range(int(start), int(end) + 1):
+        years.append(str(i))
 
     with open(target_comps_path_0) as k:
         ks = csv.reader(k)
@@ -29,7 +84,7 @@ def node_feature_generation(X1):
                 with open(d_path) as f:
                     file = csv.reader(f)
                     for line in file:
-                        if '2013' == line[0][:4] or '2014' == line[0][:4] or '2015' == line[0][:4]:
+                        if check_years(line[0][:4], years):
                             for ele in line[1:]:
                                 if ele == line[-1]:
                                     x.append(float(ele) * 0.00001)
@@ -37,11 +92,13 @@ def node_feature_generation(X1):
                                     x.append(float(ele))
 
                 X1.append(torch.Tensor(x))
+                labels.append(check_label(torch.Tensor(x)))
                 break
 
     X1 = torch.nn.utils.rnn.pad_sequence(X1, batch_first=True, padding_value=0)
+    labels_one_hot = label_generation(labels)
 
-    return X1
+    return X1, torch.Tensor(labels_one_hot)
 
 
 def edge_info_generation(X1):
@@ -76,3 +133,6 @@ def rand_seed_generation(sum):
         np.random.seed(random.sample(range(0, 9000), 1))
         p0 = np.random.rand(1)
     return p0
+
+
+def train_mask_generation():

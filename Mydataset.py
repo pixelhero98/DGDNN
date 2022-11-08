@@ -2,7 +2,8 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric.data import InMemoryDataset, download_url
 from Cross_Attention_Score import cross_attention_score
-from raw_data import edge_info_generation, node_feature_generation
+from raw_data import edge_info_generation, node_feature_label_generation
+from path_config import dataset_seg
 
 
 class MyOwnDataset(InMemoryDataset):
@@ -20,15 +21,13 @@ class MyOwnDataset(InMemoryDataset):
 
     def process(self):
 
-        X1 = node_feature_generation(X1=[])
-
+        start, end = dataset_seg(index='test')
+        X1 = []
+        X1, labels = node_feature_generation(X1, start, end)
         Edge_index, Edge_attr = edge_info_generation(X1)
-
         Edge_attr = Edge_attr.reshape(Edge_attr.shape[0], 1)
-
-        # Y = torch.tensor([0,1,0],dtype=torch.float)
-
-        data = Data(x=X1.type(torch.float), edge_index=Edge_index.type(torch.long), edge_attr=Edge_attr)
+        data = Data(x=X1.type(torch.float), edge_index=Edge_index.type(torch.long),
+                    edge_attr=Edge_attr, y=labels.type(torch.float))
 
         data_list = [data]
 
