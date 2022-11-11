@@ -25,5 +25,7 @@ def default_args():
     parser.add_argument('--val', type=str, default='val_data')
     parser.add_argument('--test', type=str, default='test_data')
     parser.add_argument('--model_save', type=str, default='model_save')
+    parser.add_argument('--num_labels', type=int, default=16)
+    parser.add_argument('--epochs', type=int, default=6400)
 
     return parser.parse_args()

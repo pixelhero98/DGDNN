@@ -24,40 +24,51 @@ def check_label(x):
 
 def label_generation(labels):
     label = []
-    for i in labels:
-        if i >= -0.01 and i <= 0.01:
-            label.append(list([0,0,0,0]))
-        elif i >= -0.15 and i < -0.01:
-            label.append(list([0,0,0,1]))
-        elif i >= -0.29 and i < -0.15:
-            label.append(list([0,0,1,0]))
-        elif i >= -0.43 and i < -0.29:
-            label.append(list([0,0,1,1]))
-        elif i >= -0.57 and i < -0.43:
-            label.append(list([0,1,0,0]))
-        elif i >= -0.71 and i < -0.57:
-            label.append(list([0,1,0,1]))
-        elif i >= -0.85 and i < -0.71:
-            label.append(list([0,1,1,0]))
-        elif i < -0.85:
-            label.append(list([0,1,1,1]))
-        elif i > 0.01 and i <= 0.15:
-            label.append(list([1,0,0,0]))
-        elif i > 0.15 and i <= 0.29:
-            label.append(list([1,0,0,1]))
-        elif i > 0.29 and i <= 0.43:
-            label.append(list([1,0,1,0]))
-        elif i > 0.43 and i <= 0.57:
-            label.append(list([1,0,1,1]))
-        elif i > 0.57 and i <= 0.71:
-            label.append(list([1,1,0,0]))
-        elif i > 0.71 and i <= 0.85:
-            label.append(list([1,1,0,1]))
-        elif i > 0.85 and i <= 0.99:
-            label.append(list([1,1,1,0]))
-        else:
-            label.append(list([1,1,1,1]))
+    increa = []
+    x0 = 0.01
+    x_next = x0
+    z = 0
+    count = 0
+    while x_next < 8.08:
+        z = 0.3 * x0
+        x_next = x_next + z
+        x0 = x_next
+        count = count + 1
+        increa.append(x0)
+    del increa[-1]
 
+    decrea = []
+    x0 = -0.01
+    x_next = x0
+    z = 0
+    count = 0
+    while x_next > -0.909:
+        z = 0.3 * x0
+        x_next = x_next + z
+        x0 = x_next
+        count = count + 1
+        decrea.append(x0)
+    del decrea[-1]
+
+    index = increa + decrea
+
+    for j in index:
+        for idx, i in enumerate(index):
+            if idx < len(index) - 1 and i > index[idx + 1]:
+                box = i
+                index[idx] = index[idx + 1]
+                index[idx + 1] = box
+
+    for i in labels:
+        box = 0
+        for index_j, j in enumerate(index):
+            if i < j:
+                box = index_j
+                break
+            elif j == index[-1]:
+                box = index_j + 1
+                break
+        label.append(box)
     return torch.Tensor(label)
 
 
@@ -113,7 +124,7 @@ def edge_info_generation(X1):
                 att_op_weight = s_atten(X1[com_name_index], com)
                 for j in att_op_weight:
                     sum = sum + j * j
-                if sum > 0.99 and rand_seed_generation(sum) > 0.33:
+                if sum > 0.2 and rand_seed_generation(sum) > 0.66:
                     edge_index_0.append(int(com_index))
                     edge_index_1.append(int(com_name_index))
                     edge_index_0.append(int(com_name_index))
@@ -129,7 +140,7 @@ def edge_info_generation(X1):
 
 
 def rand_seed_generation(sum):
-    if sum > 0.99:
+    if sum > 0.2:
         np.random.seed(random.sample(range(0, 9000), 1))
         p0 = np.random.rand(1)
     return p0

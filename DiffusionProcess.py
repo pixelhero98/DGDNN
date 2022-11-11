@@ -1,13 +1,13 @@
 from scipy.linalg import expm
-from torch_geometric.data import InMemoryDataset
+from torch_geometric.data import Data
 import numpy as np
 import torch
 
 
-def get_adj_matrix(dataset: InMemoryDataset) -> np.ndarray:
-    num_nodes = dataset.data.x.shape[0]
+def get_adj_matrix(data: Data) -> np.ndarray:
+    num_nodes = data.x.shape[0]
     adj_matrix = np.zeros(shape=(num_nodes, num_nodes))
-    for i, j in zip(dataset.data.edge_index[0], dataset.data.edge_index[1]):
+    for i, j in zip(data.edge_index[0], data.edge_index[1]):
         adj_matrix[i, j] = 1.
 
     return adj_matrix

@@ -22,6 +22,7 @@ class cross_attention_score(nn.Module):
         v = self.linear_v(x)
 
         dist = (q * k) * v * self._norm_fact
+        dist = torch.nn.functional.relu(dist)
         dist = torch.nn.functional.softmax(dist, dim=0)
 
         return dist
