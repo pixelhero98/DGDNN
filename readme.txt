@@ -1,2 +1,2 @@
 code available @ https://github.com/pixelhero98/stock-raw-data
-raw dataset available @ https://drive.google.com/drive/folders/1AKVOv0ECn19hMfI0Iu5hzGkP3jMdDyEi?usp=share_link
+raw dataset available @ https://www.dropbox.com/s/964fi1vi9ei8g2d/Colab_Notebooks-20230420T141453Z-001.zip?dl=0
