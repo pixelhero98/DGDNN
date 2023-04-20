@@ -6,7 +6,7 @@ from joint_emb import *
 
 class AU_Net(nn.Module):
 
-  def __init__(self, ins, hids0, hids1, hids2, outs, num_labels, adj_dim):
+  def __init__(self, ins, hids0, hids1, hids2, outs, num_labels, adj_dim=1026):
 
     super(AU_Net, self).__init__()
 
