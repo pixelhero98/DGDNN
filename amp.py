@@ -102,19 +102,17 @@ for ii in ['TrDataset_0', 'TrDataset_1', 'TrDataset_2']:
                 if jj == 'gx':
                     model = AU_Net(ins=traindata.x.shape[1] + traindata.x.shape[1], hids0=traindata.x.shape[1],
                                    hids1=1024, hids2=512,
-                                   outs=256, num_labels=6)
+                                   outs=256, num_labels=6, adj_dim=traindata.x.shape[0])
                 else:
                     model = AU_Net(ins=traindata.x.shape[1] + traindata.x.shape[0], hids0=traindata.x.shape[0],
                                    hids1=1024, hids2=512,
-                                   outs=256, num_labels=6)
+                                   outs=256, num_labels=6, adj_dim=traindata.x.shape[0])
 
                 # model and dataset to GPU
                 model, traindata = model.to(device), traindata.to(device)
 
                 # define optimizer
-                optimizer = torch.optim.Adam([dict(params=model.edgeconv1.parameters(), weight_decay=5e-5),
-                                              dict(params=model.edgeconv2.parameters(), weight_decay=5e-5),
-                                              dict(params=model.edgeconv3.parameters(), weight_decay=5e-5)], lr=2e-2)
+                optimizer = torch.optim.Adam(params=model.parameters(), lr=2e-4)
                 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
 
 
