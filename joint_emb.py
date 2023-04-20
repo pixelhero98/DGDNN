@@ -18,3 +18,12 @@ class joint_gemb(nn.Module):
         z = self.fc2(z)
 
         return z
+
+
+class nconv(nn.Module):
+    def __init__(self):
+        super(nconv,self).__init__()
+
+    def forward(self,x, A):
+        x = torch.matmul(A, x)
+        return x.contiguous()
