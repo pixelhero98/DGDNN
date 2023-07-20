@@ -1,47 +1,92 @@
 import torch
 import torch.nn as nn
-import torch_geometric.nn as tnn
 import torch.nn.functional as F
-from joint_emb import *
-
-class AU_Net(nn.Module):
-
-  def __init__(self, ins, hids0, hids1, hids2, outs, num_labels, adj_dim=1026):
-
-    super(AU_Net, self).__init__()
-
-    self.edgeconv1 = nn.Linear(ins, hids0)
-    self.dimreduc = nn.Linear(hids0, hids2)
-    self.gcnconv1 = tnn.GCNConv(hids0, hids1)
-    self.gcnconv2 = tnn.GCNConv(hids1, hids2)
-    self.edgeconv2 = nn.Linear(hids2 + hids1 + hids0, hids2)
-    self.edgeconv3 = nn.Linear(hids2, outs)
-    self.gdcconv = tnn.GDC(self_loop_weight=1,
-        normalization_in='sym',
-        normalization_out='col',
-        diffusion_kwargs=dict(method='coeff', alpha=0.05),
-        sparsification_kwargs=dict(method='topk', k=128, dim=0),
-        exact=True)
-    self.joint_emb = joint_gemb(ins, 2048, adj_dim)
-    self.out = nn.Linear(outs, num_labels)
-    self.neighconv = nconv()
 
 
-  def forward(self, x, edge_index, gx):
-    
-    zz = self.joint_emb(x, gx)
-    zz = self.gdcconv(zz)
-    x = self.neighconv(x, zz)
-  
-    z = F.relu(self.edgeconv1(torch.concat((x, gx), dim=1)))
-    z0 = self.dimreduc(z)
-    z1 = F.relu(self.gcnconv1(z + gx, edge_index))
-    z2 = F.relu(self.gcnconv2(z1, edge_index))
-    z = F.relu(self.edgeconv2(torch.concat((z, z1, z2), dim=1)))
-    z = F.relu(self.edgeconv3(z + z0))
-    z = self.out(z)
+class DGDNN(nn.Module):
 
-    return z
+    def __init__(self, relation_size, layer_size, node_feature_size, readout_size, layers, num_nodes, num_relation):
+
+        super(DGDNN, self).__init__()
+
+        # Initialize transition matrices and weight coefficients for all layers
+        self.T = nn.Parameter(torch.randn(layers, num_relation, num_nodes, num_nodes))
+        self.theta = nn.Parameter(torch.randn(layers, num_relation))
+
+        # Initialize different module layers at all levels
+        self.diffusion_layers = nn.ModuleList(
+            [nn.Linear(relation_size[i], relation_size[i + 1]) for i in range(len(relation_size) - 1)])
+        self.model_layers = nn.ModuleList(
+            [nn.Linear(layer_size[i], layer_size[i + 1]) for i in range(len(layer_size) - 1)])
+        self.node_feature_layers = nn.ModuleList(
+            [nn.Linear(node_feature_size[i], node_feature_size[i + 1]) for i in range(len(node_feature_size) - 1)])
+        self.readout = nn.ModuleList(
+            [nn.Linear(readout_size[i], readout_size[i + 1]) for i in range(len(readout_size) - 1)])
+
+        # Initialize activations
+        self.activation1 = nn.LeakyReLU()
+        self.activation2 = nn.ReLU()
+
+    def forward(self, X, A):
+
+        # Initialize latent representation with node feature matrix
+        z = X
+
+        for q in range(self.T.shape[0]):
+
+            # Select corresponding layer at each level
+            diffusion_layers = self.diffusion_layers[q]
+            model_layers = self.model_layers[q]
+            node_feature_layers = self.node_feature_layers[q]
+            theta = self.theta[q]
+
+            z_sum = torch.zeros_like(z)
+
+            # Information diffusion process on graphs
+            for i in range(self.T.shape[1]):
+                z_sum += (theta[i] * self.T[q][i] * A) @ z
+
+            # Information propagation transform
+            z = self.activation1(diffusion_layers(z_sum))
+
+            # Copy current output for next layer
+            box = z
+
+            # Node feature transform
+            if q != 0:
+                f = model_layers(torch.cat((f, node_feature_layers(box)), dim=1))
+                f = self.activation2(f)
+            else:
+                f = model_layers(node_feature_layers(box))
+                f = self.activation2(f)
+
+        # Readout process to generate final graph representation
+        for readouts in self.readout:
+            f = readouts(f)
+            if readouts is not self.readout[-1]:
+                f = self.activation2(f)
+
+        return F.softmax(f, dim=1)
+
+    def reset_parameters(self):
+
+        # Define the initialization methods for the model
+
+        nn.init.normal_(self.T)
+
+        nn.init.normal_(self.theta)
+
+        for layer in self.diffusion_layers:
+            nn.init.kaiming_uniform_(layer.weight)
+        for layer in self.model_layers:
+            nn.init.kaiming_uniform_(layer.weight)
+        for layer in self.node_feature_layers:
+            nn.init.kaiming_uniform_(layer.weight)
+        for layer in self.readout:
+            if layer is self.readout[-1]:
+                nn.init.xavier_uniform_(layer.weight)
+            else:
+                nn.init.kaiming_uniform_(layer.weight)
 
  
 
