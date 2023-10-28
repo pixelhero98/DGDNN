@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from graph_temporal_data import Mydataset
+from graph_dataset_gen import Mydataset
 from dgdnn import DGDNN
 from torch_geometric.logging import log
 import torch.distributions
