@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from raw_data import gx_generation, node_feature_label_generation
 from path_config import dir_path
 from Mydataset import TrDataset_0, TrDataset_1, TrDataset_2
-from AU_GaphNet import AU_Net
+from dgdnn import DGDNN
 from torch_geometric.logging import log
 import torch.distributions
 import numpy as np
@@ -117,11 +117,11 @@ for ii in ['TrDataset_2']:
 
                 # init model
                 if jj == 'gx':
-                    model = AU_Net(ins=traindata.x.shape[1] + traindata.x.shape[1], hids0=traindata.x.shape[1],
+                    model = DGDNN(ins=traindata.x.shape[1] + traindata.x.shape[1], hids0=traindata.x.shape[1],
                                    hids1=1024, hids2=512,
                                    outs=256, num_labels=new_tmp_seq.shape[1], adj_dim=traindata.x.shape[0])
                 else:
-                    model = AU_Net(ins=traindata.x.shape[1] + traindata.x.shape[0], hids0=traindata.x.shape[0],
+                    model = DGDNN(ins=traindata.x.shape[1] + traindata.x.shape[0], hids0=traindata.x.shape[0],
                                    hids1=2048, hids2=1024,
                                    outs=512, num_labels=6, adj_dim=traindata.x.shape[0])
 
@@ -144,7 +144,7 @@ for ii in ['TrDataset_2']:
                     optimizer.zero_grad()
                     out = model(traindata.x, traindata.edge_index, gx)
 
-                    loss = F.mse_loss(out, new_tmp_seq.to(device))
+                    loss = F.cross_entropy(out, new_tmp_seq.to(device))
                     loss.backward()
                     optimizer.step()
 
