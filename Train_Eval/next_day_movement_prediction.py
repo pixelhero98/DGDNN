@@ -115,15 +115,15 @@ for epoch in range(epochs):
     optimizer.zero_grad()
 
     # If performance progress of the model is required
-    model.eval()
-    for sample in train_dataset:
-        X = sample['X'].to(device)  # node feature tensor
-        A = sample['A'].to(device)  # adjacency tensor
-        C = sample['Y'].long()
-        C = C.to(device)  # label vector
+    #model.eval()
+    #for sample in train_dataset:
+        #X = sample['X'].to(device)  # node feature tensor
+        #A = sample['A'].to(device)  # adjacency tensor
+        #C = sample['Y'].long()
+        #C = C.to(device)  # label vector
 
-        out = model(X, A).argmax(dim=1)
-        acc += int((out == C).sum())
+        #out = model(X, A).argmax(dim=1)
+        #acc += int((out == C).sum())
 
 
     if epoch % 10 == 0:
