@@ -83,7 +83,7 @@ def neighbor_distance_regularizer(theta):
     theta = torch.sum(theta, dim=1)
     return theta / box
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 
 
 # Define training process & validation process & testing process
