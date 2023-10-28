@@ -66,7 +66,7 @@ model = DGDNN(diffusion_transforms, node_feature_transforms, inter_layer_transfo
               readout_layers, retention_layers, diffusion_layers, num_nodes,
               num_relation, time_steps)
 
-# Pass model and datasets to GPU
+# Pass model GPU
 model = model.to(device)
 
 # Define optimizer and objective function
