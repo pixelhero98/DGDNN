@@ -1,8 +1,6 @@
 import torch
 import torch.nn.functional as F
-from raw_data import gx_generation, node_feature_label_generation
-from path_config import dir_path
-from Mydataset import TrDataset_0, TrDataset_1, TrDataset_2
+from graph_temporal_data import Mydataset
 from dgdnn import DGDNN
 from torch_geometric.logging import log
 import torch.distributions
@@ -13,242 +11,165 @@ from matplotlib import cm
 from matplotlib import axes
 import seaborn as sns
 import sklearn.preprocessing as skp
-from sklearn import metrics
+from sklearn.metrics import matthews_corrcoef, f1_score
 
-
-#
-
-def f1_score_clc(t_label, pre_label):
-    score = 0
-    for index, i in enumerate(t_label):
-        score += metrics.f1_score(i, pre_label[index])
-
-    return score / t_label.shape[0]
-
-
-def mcc_coeff(t_label, pre_label):
-    score = 0
-    for index, i in enumerate(t_label):
-        score += metrics.matthews_corrcoef(i, pre_label[index])
-
-    return score / t_label.shape[0]
-
-
-# configure the device for running the model on GPU or CPU
-
+# Configure the device for running the model on GPU or CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# configure the default parameters
+# Configure the default variables // # these can be tuned // # examples
+sedate = ['2013-01-01', '2014-12-31']  # these can be tuned
+val_sedate = ['2015-01-01', '2015-06-30'] # these can be tuned
+test_sedate = ['2015-07-01', '2017-12-31'] # these can be tuned
+market = ['NASDAQ', 'NYSE', 'SSE'] # can be changed
+dataset_type = ['Train', 'Validation', 'Test']
+com_path = ['/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/NASDAQ.csv',
+            '/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/NYSE.csv',
+            '/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/NYSE_missing.csv']
+des = '/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/raw_stock_data/stocks_indicators/data'
+directory = "/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/raw_stock_data/stocks_indicators/data/google_finance"
 
-for ii in ['TrDataset_2']:
+NASDAQ_com_list = []
+NYSE_com_list = []
+NYSE_missing_list = []
+com_list = [NASDAQ_com_list, NYSE_com_list, NYSE_missing_list]
+for idx, path in enumerate(com_path):
+    with open(path) as f:
+        file = csv.reader(f)
+        for line in file:
+            com_list[idx].append(line[0])  # append first element of line if each line is a list
+NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
 
-    print('generating Inmemory Dataset, please wait...')
+diffusion_transforms = [84, 105, 105, 126, 126, 126, 126]
+inter_layer_transforms = [420, 378,
+                          525, 378,
+                          525, 378,
+                          630, 378,
+                          630, 378,
+                          630, 504]
+node_feature_transforms = [378, 378,
+                           756, 378,
+                           756, 378,
+                           756, 378,
+                           756, 378,
+                           882, 378]
+readout_layers = [378, 441, 2] # can be tuned
+retention_layers = [5130, 3078, 5130, 3078, 5130, 4104] # can be tuned
+diffusion_layers, num_nodes, num_relation, time_steps = 6, 1026, 5, 21 # can be tuned
 
-    for jj in ['gx']:
+# Generate datasets
+train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
+validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
+test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
 
-        for kk in ['1.0']:
-            pp_list = []
-            for vv in range(10):
-                results_list = []
+# Define model
+model = DGDNN(diffusion_transforms, node_feature_transforms, inter_layer_transforms,
+              readout_layers, retention_layers, diffusion_layers, num_nodes,
+              num_relation, time_steps)
 
-                # load training dataset
+# Pass model and datasets to GPU
+model = model.to(device)
 
-                if ii == 'TrDataset_2':
-                    traindata = TrDataset_2(root=dir_path() + 'test').data
+# Define optimizer and objective function
+def theta_regularizer(theta):
+    row_sums = torch.sum(theta, dim=1)
+    ones = torch.ones_like(row_sums)
+    return torch.sum(torch.abs(row_sums - ones))
+            
+def neighbor_distance_regularizer(theta):
+    box = torch.sum(theta, dim=1)
+    for idx, row in enumerate(theta):
+        for i, j in enumerate(row):
+            theta[idx][i] = i * j
+    theta = torch.sum(theta, dim=1)
+    return theta / box
 
-                D1 = []
-                D1, new_label = node_feature_label_generation(D1, 2015, 2015)
-
-                new_tmp_seq = []
-                new_tmp_seq1 = []
-                days = int(D1.shape[1] / 5)
-
-                D2 = []
-                D2, new_label = node_feature_label_generation(D2, 2016, 2016)
-                testdata = TrDataset_0(root=dir_path() + 'train').data
-
-                # generate up & down sequence
-                for index_pr, ppp in enumerate(D1):
-                    tmp = D1[index_pr][-2 * days + 1:-days] - D1[index_pr][:days - 1]
-
-                    new_tmp_seq.append(torch.Tensor(tmp))
-
-                new_tmp_seq = torch.nn.utils.rnn.pad_sequence(new_tmp_seq, batch_first=True, padding_value=0)
-
-                new_tmp_seq = torch.Tensor(skp.normalize(new_tmp_seq)).type(torch.float)
-
-                for index_pr, ppp in enumerate(D2):
-                    tmp = D2[index_pr][-2 * days + 1:-days] - D2[index_pr][:days - 1]
-
-                    new_tmp_seq1.append(torch.Tensor(tmp))
-
-                new_tmp_seq1 = torch.nn.utils.rnn.pad_sequence(new_tmp_seq1, batch_first=True, padding_value=0)
-
-                new_tmp_seq1 = torch.Tensor(skp.normalize(new_tmp_seq1)).type(torch.float)
-
-
-                # traindata.x = torch.Tensor(skp.normalize(D1, axis=0)).type(torch.float)
-
-                # generate gx term
-                def get_adj_matrix(data):
-                    num_nodes = data.x.shape[0]
-                    adj_matrix = np.zeros(shape=(num_nodes, num_nodes))
-                    for i, j in zip(data.edge_index[0], data.edge_index[1]):
-                        adj_matrix[i, j] = 1.
-
-                    return adj_matrix
-
-
-                if jj == 'gx':
-                    gx = []
-                    gx = gx_generation(gx, traindata)
-                else:
-                    gx = []
-                    gx = torch.Tensor(get_adj_matrix(traindata))
-                    key = 0
-                    for index_j, j in enumerate(gx):
-                        for index_k, k in enumerate(j):
-                            if k != 0:
-                                gx[index_j][index_k] = traindata.edge_attr[key]
-                                key += 1
-
-                # gx term to device
-                gx = gx.to(device)
-
-                # init model
-                if jj == 'gx':
-                    model = DGDNN(ins=traindata.x.shape[1] + traindata.x.shape[1], hids0=traindata.x.shape[1],
-                                   hids1=1024, hids2=512,
-                                   outs=256, num_labels=new_tmp_seq.shape[1], adj_dim=traindata.x.shape[0])
-                else:
-                    model = DGDNN(ins=traindata.x.shape[1] + traindata.x.shape[0], hids0=traindata.x.shape[0],
-                                   hids1=2048, hids2=1024,
-                                   outs=512, num_labels=6, adj_dim=traindata.x.shape[0])
-
-                # model and dataset to GPU
-                model, traindata = model.to(device), traindata.to(device)
-
-                # define optimizer
-                optimizer = torch.optim.Adam(params=model.parameters(), lr=2e-4)
-                scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.997)
-                # define training process & testing process
-
-                gx1 = []
-                gx1 = gx_generation(gx1, testdata)
-
-                gx1, testdata = gx1.to(device), testdata.to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 
-                def train():
-                    model.train()
-                    optimizer.zero_grad()
-                    out = model(traindata.x, traindata.edge_index, gx)
+# Define training process & validation process & testing process
 
-                    loss = F.cross_entropy(out, new_tmp_seq.to(device))
-                    loss.backward()
-                    optimizer.step()
+epochs = 600
+model.reset_parameters()
 
-                    return float(loss.item())
+# Training
+for epoch in range(epochs):
+    model.train()
 
+    objective_total = 0
+    acc = 0
 
-                @torch.no_grad()
-                def test():
-                    model.eval()
-                    accs = []
-                    out = model(traindata.x, traindata.edge_index, gx)
-                    tmp_pre = out
+    for sample in train_dataset:
+        X = sample['X'].to(device)  # node feature tensor
+        A = sample['A'].to(device)  # adjacency tensor
+        C = sample['Y'].long()
+        C = C.to(device)  # label vector
 
-                    tmp_pre[tmp_pre > 0] = 1
-                    tmp_pre[tmp_pre < 0] = 0
+        objective = F.cross_entropy(model(X, A), C)
+        objective += theta_regularizer(model.theta) + 0.0029 * neighbor_distance_regularizer(model.theta)
 
-                    tmp_new = new_tmp_seq
+        objective_total += objective
 
-                    tmp_new[tmp_new > 0] = 1
-                    tmp_new[tmp_new < 0] = 0
+    objective_average = objective_total / len(train_dataset)
+    objective_average.backward()
+    optimizer.step()
+    optimizer.zero_grad()
 
-                    accs.append(int((tmp_pre == tmp_new.to(device)).sum()) / int(out.shape[0] * out.shape[1]))
+    # If performance progress of the model is required
+    model.eval()
+    for sample in train_dataset:
+        X = sample['X'].to(device)  # node feature tensor
+        A = sample['A'].to(device)  # adjacency tensor
+        C = sample['Y'].long()
+        C = C.to(device)  # label vector
 
-                    out = model(testdata.x, testdata.edge_index, gx1)
-                    tmp_pre = out
-
-                    tmp_pre[tmp_pre > 0] = 1
-                    tmp_pre[tmp_pre < 0] = 0
-
-                    tmp_new1 = new_tmp_seq1
-
-                    tmp_new1[tmp_new1 > 0] = 1
-                    tmp_new1[tmp_new1 < 0] = 0
-
-                    accs.append(int((tmp_pre == tmp_new1.to(device)).sum()) / int(out.shape[0] * out.shape[1]))
-
-                    score = f1_score_clc(tmp_new1.cpu(), tmp_pre.cpu())
-
-                    mcc = mcc_coeff(tmp_new1.cpu(), tmp_pre.cpu())
-
-                    return accs, score, mcc
+        out = model(X, A).argmax(dim=1)
+        acc += int((out == C).sum())
 
 
-                # record accuracy change with respect to training process
+    if epoch % 10 == 0:
+        print(f'Epoch {epoch}: {objective_average.item()}')
+        print('ACC: ', acc / ( len(train_dataset) * C.shape[0]))
 
-                loss_0 = 0
-                testacc_0 = 0
-                score_0 = 0
-                mcc_0 = 0
-                epoch_l = []
-                loss_l = []
-                train_l = []
-                val_l = []
-                test_l = []
-                btrain_l = []
-                bval_l = []
-                btest_l = []
+# Validation
+model.eval()
 
-                for epoch in range(0, 5000):
+# Define evaluation metrics
+# ACC, MCC, and F1
+acc = 0
+f1 = 0
+mcc = 0
 
-                    loss = train()
-                    [tacc, testacc], score, mcc = test()
+for idx, sample in enumerate(validation_dataset):
 
-                    epoch_l.append(epoch)
-                    loss_l.append(loss)
-                    train_l.append(tacc)
+    X = sample['X']  # node feature tensor
+    A = sample['A']  # adjacency tensor
+    C = sample['Y']  # label vector
+    out = model(X, A).argmax(dim=1)
 
-                    btrain_l.append(tacc)
+    acc += int((out == C).sum())
+    f1 += f1_score(C, out.cpu().numpy())
+    mcc += matthews_corrcoef(C, out.cpu().numpy())
 
-                    loss_0 = loss
-                    testacc_0 = testacc
-                    score_0 = score
-                    mcc_0 = mcc
+print(acc / (len(validation_dataset) * C.shape[0]))
+print(f1 / len(validation_dataset))
+print(mcc/ len(validation_dataset))
 
-                    log(Epoch=epoch, Loss=loss, TrainAcc=tacc, TestAcc=testacc, F1_score=score, MCC=mcc)
+# Test
 
-                    if epoch < 805:
-                        scheduler.step()
+acc = 0
+f1 = 0
+mcc = 0
 
-                torch.save(model, dir_path() + 'model_next_day' + '_' + str(ii) + '_' + str(jj) + '_' + str(kk))
+for idx, sample in enumerate(test_dataset):
+    X = sample['X']  # node feature tensor
+    A = sample['A']  # adjacency tensor
+    C = sample['Y']  # label vector
+    out = model(X, A).argmax(dim=1)
 
-                # plot the training & validation & test process
-                # plt.plot(epoch_l, loss_l, label='loss')
-                # plt.plot(epoch_l, train_l, label='train_acc')
-                # plt.plot(epoch_l, btrain_l, label = 'best_train_acc')
-                # plt.plot(epoch_l, bval_l, label = 'best_val_acc')
-                # plt.plot(epoch_l, btest_l, label = 'best_test_acc')
-                # plt.legend()
-                # plt.xlabel('number of epochs')
-                # plt.ylabel('values')
-                # plt.show()
+    acc += int((out == C).sum())
+    f1 += f1_score(C, out.cpu().numpy())
+    mcc += matthews_corrcoef(C, out.cpu().numpy())
 
-                results_list.append(loss_0)
-                results_list.append(testacc_0)
-                results_list.append(score_0)
-                results_list.append(mcc_0)
-                # save model to the directory
-                torch.save(model, dir_path() + 'model_next_day' + '_' + str(ii) + '_' + str(jj) + '_' + str(kk))
-
-                # model = torch.load(dir_path() + 'NASDAQ/model' + '_' + str(ii) + '_' + str(jj) + '_' + str(kk))
-
-                pp_list.append(results_list)
-
-                f = open(dir_path() + 'model_next_day' + '_' + str(ii) + '_' + str(jj) + '_' + str(kk) + '.txt', 'w')
-                for content in pp_list:
-                    f.write(str(content) + '\n')
-                f.close()
+print(acc / (len(test_dataset) * C.shape[0]))
+print(f1 / len(test_dataset))
+print(mcc / len(test_dataset))
