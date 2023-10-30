@@ -19,7 +19,7 @@ class DGDNN(nn.Module):
         super(DGDNN, self).__init__()
 
         # Initialize transition matrices and weight coefficients for all layers
-        self.T = nn.Parameter(torch.randn(layers, num_nodes, num_nodes))
+        self.T = nn.Parameter(torch.randn(layers, expansion_step, num_nodes, num_nodes))
         self.theta = nn.Parameter(torch.randn(layers, expansion_step))
 
         # Initialize different module layers at all levels
