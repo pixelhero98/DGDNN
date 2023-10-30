@@ -12,6 +12,7 @@ from typing import List, Tuple
 from functools import lru_cache
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
+import math
 
 
 class MyDataset(Dataset):
@@ -110,11 +111,8 @@ class MyDataset(Dataset):
     entropy = np.array([self.information_entropy(tuple(x)) for x in X])
     for i in range(X.shape[0]):
       for j in range(X.shape[0]):
-        if entropy[i] < entropy[j]:
-          A[i, j] = torch.tensor(energy[i] / energy[j], dtype=torch.float32)
-        else:
-          A[i, j] = 0.
-
+          A[i, j] = torch.tensor((energy[i] / energy[j]) * math.e ** (entropy[i] + entropy[j] - self.information_entropy(tuple(torch.cat(X[i], X[j])))), dtype=torch.float32)
+          
     return A
 
 
@@ -174,14 +172,17 @@ class MyDataset(Dataset):
 
         # Slice the desired data and do normalization on raw data
         X = X[:,:,:-1]
-        for i in range(X.shape[0]):
-          # Adding 1 before taking log to avoid log(0)
-          X[i] = torch.Tensor(np.log1p(X[i].numpy()))
+        X_dim = [X.shape[0], X.shape[-1]]
+        X = X.view(-1, X_dim[-1])
+        X = torch.chunk(X, X_dim[0], dim=0)
+        X = torch.cat(X, dim=1)
+      
+        # Adding 1 before taking log to avoid log(0)
+        X = torch.Tensor(np.log1p(X.numpy()))
 
         # Obtain adjacency tensor
-        A = torch.zeros((X.shape[0], X.shape[1], X.shape[1]))
-        for j in range(A.shape[0]):
-            A[j] = self.adjacency_matrix(X[j])
+        A = torch.zeros((X.shape[0], X.shape[0]))
+        A = self.adjacency_matrix(X)
 
         # Save the X, A, C tensors
         os.makedirs(directory_path, exist_ok=True)
