@@ -73,12 +73,12 @@ model = model.to(device)
 
 # Define optimizer and objective function
 def theta_regularizer(theta):
-    row_sums = torch.sum(theta, dim=1)
+    row_sums = torch.sum(theta, dim=-1)
     ones = torch.ones_like(row_sums)
     return torch.sum(torch.abs(row_sums - ones))
             
 def neighbor_distance_regularizer(theta):
-    box = torch.sum(theta, dim=1)
+    box = torch.sum(theta, dim=-1)
     for idx, row in enumerate(theta):
         for i, j in enumerate(row):
             theta[idx][i] = i * j
