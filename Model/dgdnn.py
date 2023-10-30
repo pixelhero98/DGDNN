@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class DGDNN(nn.Module):
-    def __init__(self, relation_size, layer_size, node_feature_size, readout_size, layers, num_nodes, num_relation):
+    def __init__(self, relation_size, layer_size, node_feature_size, readout_size, layers, num_nodes, expansion_step):
         """
         Initialize the Decoupled Graph Diffusion Neural Network (DGDNN) model.
 
@@ -14,13 +14,13 @@ class DGDNN(nn.Module):
             readout_size (list): Sizes of hidden layers for the readout process.
             layers (int): Number of layers.
             num_nodes (int): Number of nodes in the graph.
-            num_relation (int): Number of relation types.
+            expansion_step (int): Number of expansion steps.
         """
         super(DGDNN, self).__init__()
 
         # Initialize transition matrices and weight coefficients for all layers
-        self.T = nn.Parameter(torch.randn(layers, num_relation, num_nodes, num_nodes))
-        self.theta = nn.Parameter(torch.randn(layers, num_relation))
+        self.T = nn.Parameter(torch.randn(layers, expansion_step, num_nodes, num_nodes))
+        self.theta = nn.Parameter(torch.randn(layers, expansion_step))
 
         # Initialize different module layers at all levels
         self.diffusion_layers = nn.ModuleList(
