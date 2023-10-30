@@ -1,2 +1,4 @@
 
 raw dataset available @ https://drive.google.com/drive/folders/1ZxD4QMWNwaeP4DCoGqWWVb0VonkSSK6I?usp=sharing or https://www.dropbox.com/sh/iwdmcfpooxjfy6x/AACc6IcICIc7RbnRjTkid6bTa?dl=0
+
+Reminder: these codes need to be packed up for click-to-use. Upon testing, you must generate graph datasets from raw datasets. Then, using both model and training files. All hyperparameters and tunable variables are examples in the codes. 
