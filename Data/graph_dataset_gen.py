@@ -64,7 +64,7 @@ class MyDataset(Dataset):
 
                     if self.check_years(date_str, start, end):
                         dates.add(date_str)
-                    elif self.check_years(date_str, end, '2017-12-31'):  # Assuming no dates later than '2018-12-31'
+                    elif self.check_years(date_str, end, '2017-12-31'):  # '2017-12-31' is just an example, replacing with the latest date when datasets change
                         after_end_dates.add(date_str)
 
             date_sets.append(dates)
