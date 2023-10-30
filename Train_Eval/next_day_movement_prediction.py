@@ -55,16 +55,18 @@ node_feature_transforms = [378, 378,
 readout_layers = [378, 441, 2] # can be tuned
 retention_layers = [5130, 3078, 5130, 3078, 5130, 4104] # can be tuned
 diffusion_layers, num_nodes, num_relation, time_steps = 6, 1026, 5, 21 # can be tuned 22/19/14/else
+expansion_steps = 7
 
 # Generate datasets
 train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
 validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
 test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
 
+
 # Define model
 model = DGDNN(diffusion_transforms, node_feature_transforms, inter_layer_transforms,
               readout_layers, retention_layers, diffusion_layers, num_nodes,
-              num_relation, time_steps)
+              num_relation, time_steps, expansion_steps)
 
 # Pass model GPU
 model = model.to(device)
