@@ -62,7 +62,7 @@ class DGDNN(nn.Module):
 
             # Information diffusion process on graphs
             for i in range(self.T.shape[1]):
-                z_sum += (theta[i] * self.T[q][i] * A) @ z
+                z_sum += (theta[q][i] * self.T[q][i] * A) @ z
 
             # Information propagation transform
             z = self.activation1(diffusion_layers(z_sum))
