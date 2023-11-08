@@ -1,4 +1,5 @@
 import torch
+import math
 import csv
 import os
 import numpy as np
@@ -7,7 +8,7 @@ from datetime import datetime
 from typing import List, Tuple
 from functools import lru_cache
 from tqdm import tqdm
-import math
+from torch.utils.data import Dataset
 
 class MyDataset(Dataset):
     def __init__(self, root: str, desti: str, market: str, comlist: List[str], start: str, end: str, window: int, dataset_type: str):
