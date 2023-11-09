@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class DGDNN(nn.Module):
-    def __init__(self, relation_size, layer_size, node_feature_size, readout_size, layers, num_nodes, expansion_step):
+    def __init__(self, diffusion_size, linear_size, decoupled_size, mlp_size, layers, num_nodes, expansion_step):
         """
         Initialize the Decoupled Graph Diffusion Neural Network (DGDNN) model.
 
@@ -24,17 +24,16 @@ class DGDNN(nn.Module):
 
         # Initialize different module layers at all levels
         self.diffusion_layers = nn.ModuleList(
-            [nn.Linear(relation_size[i], relation_size[i + 1]) for i in range(len(relation_size) - 1)])
-        self.model_layers = nn.ModuleList(
-            [nn.Linear(layer_size[i], layer_size[i + 1]) for i in range(len(layer_size) - 1)])
-        self.node_feature_layers = nn.ModuleList(
-            [nn.Linear(node_feature_size[i], node_feature_size[i + 1]) for i in range(len(node_feature_size) - 1)])
-        self.readout = nn.ModuleList(
-            [nn.Linear(readout_size[i], readout_size[i + 1]) for i in range(len(readout_size) - 1)])
+            [GeneralizedGraphDiffusion(diffusion_size[i], diffusion_size[i + 1]) for i in range(len(diffusion_size) - 1)])
+        self.linear_layers = nn.ModuleList(
+            [nn.Linear(linear_size[2 * i], linear_size[2 * i + 1]) for i in range(len(linear_size) // 2)])
+        self.decoupled_layers = nn.ModuleList(
+            [nn.Linear(decoupled_size[2 * i], decoupled_size[2 * i + 1]) for i in range(len(decoupled_size) // 2)])
+        self.mlp = nn.ModuleList(
+            [nn.Linear(mlp_size[i], mlp_size[i + 1]) for i in range(len(mlp_size) - 1)])
 
         # Initialize activations
-        self.activation1 = nn.LeakyReLU()
-        self.activation2 = nn.ReLU()
+        self.activation2 = nn.LeakyReLU()
 
     def forward(self, X, A):
         """
@@ -49,42 +48,19 @@ class DGDNN(nn.Module):
         """
         # Initialize latent representation with node feature matrix
         z = X
+        h = X
 
         for q in range(self.T.shape[0]):
-
-            # Select corresponding layer at each level
-            diffusion_layers = self.diffusion_layers[q]
-            model_layers = self.model_layers[q]
-            node_feature_layers = self.node_feature_layers[q]
-            theta = self.theta[q]
-
-            z_sum = torch.zeros_like(z)
-
-            # Information diffusion process on graphs
-            for i in range(self.T.shape[1]):
-                z_sum += (theta[q][i] * self.T[q][i] * A) @ z
-
-            # Information propagation transform
-            z = self.activation1(diffusion_layers(z_sum))
-
-            # Copy current output for next layer
-            box = z
-
-            # Node feature transform
-            if q != 0:
-                f = model_layers(torch.cat((f, node_feature_layers(box)), dim=1))
-                f = self.activation2(f)
-            else:
-                f = model_layers(node_feature_layers(box))
-                f = self.activation2(f)
+          z = self.diffusion_layers[q](self.theta[q], self.T[q], z, A)
+          h = self.activation2(self.decoupled_layers[q](torch.cat((self.linear_layers[q](z), h), dim=1)))
 
         # Readout process to generate final graph representation
-        for readouts in self.readout:
-            f = readouts(f)
-            if readouts is not self.readout[-1]:
-                f = self.activation2(f)
+        for l in self.mlp:
+          h = l(h)
+          if l is not self.mlp[-1]:
+            h = self.activation2(h)
 
-        return F.softmax(f, dim=1)
+        return h
 
     def reset_parameters(self):
         """
@@ -92,19 +68,6 @@ class DGDNN(nn.Module):
         """
         nn.init.normal_(self.T)
         nn.init.normal_(self.theta)
-
-        for layer in self.diffusion_layers:
-            nn.init.kaiming_uniform_(layer.weight)
-        for layer in self.model_layers:
-            nn.init.kaiming_uniform_(layer.weight)
-        for layer in self.node_feature_layers:
-            nn.init.kaiming_uniform_(layer.weight)
-        for layer in self.readout:
-            if layer is self.readout[-1]:
-                nn.init.xavier_uniform_(layer.weight)
-            else:
-                nn.init.kaiming_uniform_(layer.weight)
-
  
 
 
