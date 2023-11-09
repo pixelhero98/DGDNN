@@ -39,23 +39,12 @@ for idx, path in enumerate(com_path):
             com_list[idx].append(line[0])  # append first element of line if each line is a list
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
 
-diffusion_transforms = [84, 105, 105, 126, 126, 126, 126]
-inter_layer_transforms = [420, 378,
-                          525, 378,
-                          525, 378,
-                          630, 378,
-                          630, 378,
-                          630, 504]
-node_feature_transforms = [378, 378,
-                           756, 378,
-                           756, 378,
-                           756, 378,
-                           756, 378,
-                           882, 378]
-readout_layers = [378, 441, 2] # can be tuned
-retention_layers = [5130, 3078, 5130, 3078, 5130, 4104] # can be tuned
-diffusion_layers, num_nodes, num_relation, time_steps = 6, 1026, 5, 21 # can be tuned 22/19/14/else
-expansion_steps = 7
+diffusion_size = [110, 256, 512, 540, 560, 400, 320]
+linear_size = [256, 310, 512, 400, 540, 380, 560, 350, 400, 300, 320, 256]
+decoupled_size = [310+110, 256, 400+256, 512, 380+512, 1024, 350+1024, 1200, 300+1200, 1300, 256+1300, 1024]
+mlp_size = [1024, 512, 256, 2] 
+layers, num_nodes, expansion_step = 6, 1026, 7
+
 
 # Generate datasets
 train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
@@ -64,9 +53,7 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], 
 
 
 # Define model
-model = DGDNN(diffusion_transforms, node_feature_transforms, inter_layer_transforms,
-              readout_layers, retention_layers, diffusion_layers, num_nodes,
-              num_relation, time_steps, expansion_steps)
+model = DGDNN(diffusion_size, linear_size, decoupled_size, mlp_size, layers, num_nodes, expansion_step)
 
 # Pass model GPU
 model = model.to(device)
