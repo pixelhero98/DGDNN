@@ -73,7 +73,7 @@ def neighbor_distance_regularizer(theta):
             result[idx, i] = i * j
 
     result_sum = torch.sum(result, dim=1)
-    return result / result_sum[:, None]
+    return torch.sum(result / result_sum[:, None])
 
 optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 
@@ -97,7 +97,7 @@ for epoch in range(epochs):
         C = C.to(device)  # label vector
 
         objective = F.cross_entropy(model(X, A), C)
-        objective += theta_regularizer(model.theta) + 0.0029 * neighbor_distance_regularizer(model.theta)
+        objective += theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
 
         objective_total += objective
 
