@@ -40,10 +40,9 @@ for idx, path in enumerate(com_path):
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
 
 diffusion_size = [110, 256, 512, 540, 560, 400, 320]
-linear_size = [256, 310, 512, 400, 540, 380, 560, 350, 400, 300, 320, 256]
-decoupled_size = [310+110, 256, 400+256, 512, 380+512, 1024, 350+1024, 1200, 300+1200, 1300, 256+1300, 1024]
+emb_size = [110+256, 512, 512+512, 2048, 2048+540, 2048, 2048+560, 1024, 1024+400, 1024, 1024+320, 1024]
 mlp_size = [1024, 512, 256, 2] 
-layers, num_nodes, expansion_step = 6, 1026, 7
+layers, num_nodes, expansion_step, num_heads = 6, 1026, 7, 2
 
 
 # Generate datasets
@@ -53,7 +52,7 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], 
 
 
 # Define model
-model = DGDNN(diffusion_size, linear_size, decoupled_size, mlp_size, layers, num_nodes, expansion_step)
+model = DGDNN(diffusion_size, emb_size, mlp_size, layers, num_nodes, expansion_step, num_heads)
 
 # Pass model GPU
 model = model.to(device)
