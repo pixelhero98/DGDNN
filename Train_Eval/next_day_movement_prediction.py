@@ -47,8 +47,8 @@ layers, num_nodes, expansion_step, num_heads = 6, 1026, 7, 2
 
 # Generate datasets
 train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
-validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
-test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
+validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 21, dataset_type[1])
+test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate[0], test_sedate[1], 21, dataset_type[2])
 
 
 # Define model
@@ -96,11 +96,9 @@ for epoch in range(epochs):
         C = C.to(device)  # label vector
 
         objective = F.cross_entropy(model(X, A), C)
-        objective += theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
-
         objective_total += objective
 
-    objective_average = objective_total / len(train_dataset)
+    objective_average = objective_total / len(train_dataset) + theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
     objective_average.backward()
     optimizer.step()
     optimizer.zero_grad()
