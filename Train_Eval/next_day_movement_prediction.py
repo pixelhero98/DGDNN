@@ -39,12 +39,6 @@ for idx, path in enumerate(com_path):
             com_list[idx].append(line[0])  # append first element of line if each line is a list
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
 
-diffusion_size = [110, 256, 512, 540, 560, 400, 320]
-emb_size = [110+256, 512, 512+512, 2048, 2048+540, 2048, 2048+560, 1024, 1024+400, 1024, 1024+320, 1024]
-mlp_size = [1024, 512, 256, 2] 
-layers, num_nodes, expansion_step, num_heads = 6, 1026, 7, 2
-
-
 # Generate datasets
 train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
 validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 21, dataset_type[1])
@@ -52,7 +46,10 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate
 
 
 # Define model
-model = DGDNN(diffusion_size, emb_size, mlp_size, layers, num_nodes, expansion_step, num_heads)
+layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 5, 1026, 7, 2, [True, False, False, False, False], 22, 2
+diffusion_size = [5 * timestamp, 31 * timestamp, 28 * timestamp, 24 * timestamp, 20 * timestamp, 16 * timestamp]
+emb_size = [5 + 31, 64, 28 + 64, 50, 24 + 50, 38, 20 + 38, 24, 16 + 24, 12]     
+model = DGDNN(diffusion_size, emb_size, classes, layers, num_nodes, expansion_step, num_heads, active, timestamp).to(device)
 
 # Pass model GPU
 model = model.to(device)
@@ -74,8 +71,7 @@ def neighbor_distance_regularizer(theta):
     result_sum = torch.sum(result, dim=1)
     return torch.sum(result / result_sum[:, None])
 
-optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
-
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=5e-4)
 
 # Define training process & validation process & testing process
 
