@@ -10,7 +10,6 @@ class DGDNN(nn.Module):
         Initialize the Decoupled Graph Diffusion Neural Network (DGDNN) model.
 
         Args:
-            relation_size (list): Sizes of relation embeddings at each layer.
             layer_size (list): Sizes of hidden layers for information propagation.
             node_feature_size (list): Sizes of hidden layers for node feature transformation.
             readout_size (list): Sizes of hidden layers for the readout process.
