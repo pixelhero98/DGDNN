@@ -77,12 +77,12 @@ class MyDataset(Dataset):
 
         return sorted(all_dates), next_common_day
 
-    @lru_cache(maxsize=None)
+    #@lru_cache(maxsize=None)
     def signal_energy(self, x_tuple: Tuple[float]) -> float:
         x = np.array(x_tuple)
         return np.sum(np.square(x))
 
-    @lru_cache(maxsize=None)
+    #@lru_cache(maxsize=None)
     def information_entropy(self, x_tuple: Tuple[float]) -> float:
         x = np.array(x_tuple)
         unique, counts = np.unique(x, return_counts=True)
@@ -146,7 +146,6 @@ class MyDataset(Dataset):
             X = torch.chunk(X, X_dim[0], dim=0)
             X = torch.cat(X, dim=1)
             X = torch.Tensor(np.log1p(X.numpy()))
-            A = torch.zeros((X.shape[0], X.shape[0]))
             A = self.adjacency_matrix(X)
 
             os.makedirs(directory_path, exist_ok=True)
