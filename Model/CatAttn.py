@@ -12,9 +12,10 @@ class CatMultiAttn(torch.nn.Module):
         self.timestamp = timestamp
 
     def forward(self, h, h_prime):
-        h = torch.cat((h, h_prime), dim=1).view(h.shape[0], self.timestamp, -1)
+        h = torch.cat((h, h_prime), dim=1).view(self.timestamp, h.shape[0], -1)
         h, _ = self.attn_layer(h, h, h)
-        h = h.reshape(h.shape[0], -1)
+        h = h.reshape(h.shape[1], -1)
+        
         if self.active:
             h = self.activation(self.linear_layer(h))
         else:
