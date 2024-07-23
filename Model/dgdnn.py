@@ -28,3 +28,26 @@ class DGDNN(nn.Module):
 
         h = self.linear(h)
         return h
+
+# For those who use fast implementation version.
+#class DGDNN(nn.Module):
+    #def __init__(self, diffusion_size, embedding_size, classes, num_heads, active, timestamp, layers):
+        #super(DGDNN, self).__init__()
+
+        # Initialize different module layers at all levels
+        #self.diffusion_layers = nn.ModuleList(
+            #[GeneralizedGraphDiffusion(diffusion_size[i], diffusion_size[i + 1], active[i]) for i in range(len(diffusion_size) - 1)])
+        #self.cat_attn_layers = nn.ModuleList(
+            #[CatMultiAttn(embedding_size[2 * i], num_heads, embedding_size[2 * i + 1], active[i], timestamp) for i in range(len(embedding_size) // 2)])
+        #self.linear = nn.Linear(embedding_size[-1]*timestamp, classes)
+
+    #def forward(self, X, A, W):
+        #z, h = X, X
+
+        #for l in range(layers):
+            #z = self.diffusion_layers[l](z, A, W)
+            #h = self.cat_attn_layers[l](z, h)
+
+        #h = self.linear(h)
+
+        #return h
