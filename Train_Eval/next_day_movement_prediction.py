@@ -40,15 +40,17 @@ for idx, path in enumerate(com_path):
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
 
 # Generate datasets
-train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 21, dataset_type[0])
-validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 21, dataset_type[1])
-test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate[0], test_sedate[1], 21, dataset_type[2])
+train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 19, dataset_type[0])
+validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 19, dataset_type[1])
+test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate[0], test_sedate[1], 19, dataset_type[2])
 
 
 # Define model
-layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 5, 1026, 7, 2, [True, False, False, False, False], 22, 2
-diffusion_size = [5 * timestamp, 31 * timestamp, 28 * timestamp, 24 * timestamp, 20 * timestamp, 16 * timestamp]
-emb_size = [5 + 31, 64, 28 + 64, 50, 24 + 50, 38, 20 + 38, 24, 16 + 24, 12]     
+layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, False, False, False, False, False], 19, 2
+diffusion_size = [5*timestamp, 31*timestamp, 28*timestamp, 24*timestamp, 20*timestamp, 16*timestamp, 12*timestamp]
+emb_size = [5 + 31, 64, 28 + 64, 50,
+            24 + 50, 38, 20 + 38, 24,
+            16 + 24, 12, 12+12, 10]  
 model = DGDNN(diffusion_size, emb_size, classes, layers, num_nodes, expansion_step, num_heads, active, timestamp).to(device)
 
 # Pass model GPU
@@ -71,17 +73,17 @@ def neighbor_distance_regularizer(theta):
     result_sum = torch.sum(result, dim=1)
     return torch.sum(result / result_sum[:, None])
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=5e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1.5e-5)
 
 # Define training process & validation process & testing process
 
-epochs = 600
+epochs = 6000
 model.reset_parameters()
 
 # Training
 for epoch in range(epochs):
     model.train()
-
+    optimizer.zero_grad()
     objective_total = 0
     acc = 0
 
@@ -97,7 +99,7 @@ for epoch in range(epochs):
     objective_average = objective_total / len(train_dataset) + theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
     objective_average.backward()
     optimizer.step()
-    optimizer.zero_grad()
+    
 
     # If performance progress of the model is required
     #model.eval()
