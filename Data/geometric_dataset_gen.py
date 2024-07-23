@@ -14,7 +14,7 @@ from scipy.linalg import expm
 
 
 class MyDataset(Dataset):
-    def __init__(self, root: str, desti: str, market: str, comlist: List[str], start: str, end: str, window: int, dataset_type: str):
+    def __init__(self, root: str, desti: str, market: str, comlist: List[str], start: str, end: str, window: int, dataset_type: str, fast_approx):
         super().__init()
 
         self.comlist = comlist
@@ -26,6 +26,7 @@ class MyDataset(Dataset):
         self.window = window
         self.dates, self.next_day = self.find_dates(start, end, root, comlist, market)
         self.dataset_type = dataset_type
+        self.fast_approx = fast_approx
         # Check if graph files already exist
         graph_files_exist = all(os.path.exists(os.path.join(desti, f'{market}_{dataset_type}_{start}_{end}_{window}/graph_{i}.pt')) for i in range(len(self.dates) - window + 1))
 
@@ -97,7 +98,7 @@ class MyDataset(Dataset):
         
         return entropy
 
-    def adjacency_matrix(self, fast_approx, X: torch.Tensor) -> torch.Tensor:
+    def adjacency_matrix(self, X: torch.Tensor) -> torch.Tensor:
         A = torch.zeros((X.shape[0], X.shape[0]))
         X = X.numpy()
         energy = np.array([self.signal_energy(tuple(x)) for x in X])
@@ -108,7 +109,7 @@ class MyDataset(Dataset):
                 concat_x = np.concatenate((X[i], X[j]))
                 A[i, j] = torch.tensor((energy[i] / energy[j]) * (math.exp(entropy[i] + entropy[j] - self.information_entropy(tuple(concat_x)))), dtype=torch.float32)
                 
-        if fast_approx:
+        if self.fast_approx:
             t = 5
             A = A.numpy()
             num_nodes = A.shape[0]
