@@ -38,11 +38,11 @@ for idx, path in enumerate(com_path):
         for line in file:
             com_list[idx].append(line[0])  # append first element of line if each line is a list
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
-
+fast_approx = False # True for fast approximation and implementation
 # Generate datasets
-train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 19, dataset_type[0])
-validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 19, dataset_type[1])
-test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate[0], test_sedate[1], 19, dataset_type[2])
+train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 19, dataset_type[0], fast_approx)
+validation_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, val_sedate[0], val_sedate[1], 19, dataset_type[1], fast_approx)
+test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate[0], test_sedate[1], 19, dataset_type[2], fast_approx)
 
 
 # Define model
