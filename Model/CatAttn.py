@@ -10,15 +10,15 @@ class CatMultiAttn(torch.nn.Module):
         self.activation = nn.PReLU()
         self.active = active
         self.timestamp = timestamp
+        self.layernorm = nn.functional.layer_norm
 
     def forward(self, h, h_prime):
         h = torch.cat((h, h_prime), dim=1).view(self.timestamp, h.shape[0], -1)
         h, _ = self.attn_layer(h, h, h)
         h = h.reshape(h.shape[1], -1)
-        
+        h = self.layernorm(self.linear_layer(h))
         if self.active:
-            h = self.activation(self.linear_layer(h))
+            h = self.activation(h)
+            return h
         else:
-          h = self.linear_layer(h)
-
-        return h
+            return h
