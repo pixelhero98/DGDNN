@@ -83,39 +83,28 @@ model.reset_parameters()
 # Training
 for epoch in range(epochs):
     model.train()
-    optimizer.zero_grad()
     objective_total = 0
-    acc = 0
+    correct = 0
+    total = 0
 
-    for sample in train_dataset:
+    for sample in train_dataset: #Recommend to update every sample, full batch training can be time-consuming
         X = sample['X'].to(device)  # node feature tensor
         A = sample['A'].to(device)  # adjacency tensor
         C = sample['Y'].long()
         C = C.to(device)  # label vector
-
-        objective = F.cross_entropy(model(X, A), C)
-        objective_total += objective
-
-    objective_average = objective_total / len(train_dataset) + theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
-    objective_average.backward()
-    optimizer.step()
-    
+        optimizer.zero_grad()
+        out = model(X, A)
+        objective = F.cross_entropy(out, C) + theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
+        objective.backward()
+        optimizer.step()
+        objective_total += objective.item()
 
     # If performance progress of the model is required
-    #model.eval()
-    #for sample in train_dataset:
-        #X = sample['X'].to(device)  # node feature tensor
-        #A = sample['A'].to(device)  # adjacency tensor
-        #C = sample['Y'].long()
-        #C = C.to(device)  # label vector
-
-        #out = model(X, A).argmax(dim=1)
-        #acc += int((out == C).sum())
-
-
-    if epoch % 10 == 0:
-        print(f'Epoch {epoch}: {objective_average.item()}')
-        print('ACC: ', acc / ( len(train_dataset) * C.shape[0]))
+        out = out.argmax(dim=1)
+        correct += int((out == C).sum()).item()
+        total += C.shape[0]
+        if epoch % 1 == 0:
+          print(f"Epoch {epoch}: loss={objective_total:.4f}, acc={correct / total:.4f}")
 
 # Validation
 model.eval()
