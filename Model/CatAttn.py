@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 
 class CatMultiAttn(torch.nn.Module):
     def __init__(self, embedding, num_heads, output, active, timestamp):
         super(CatMultiAttn, self).__init__()
         self.attn_layer = nn.MultiheadAttention(embedding, num_heads)
         self.linear_layer = nn.Linear(embedding*timestamp, output*timestamp)
-        self.activation = nn.PReLU()
         self.active = active
         self.timestamp = timestamp
         self.layernorm = nn.functional.layer_norm
@@ -18,7 +17,7 @@ class CatMultiAttn(torch.nn.Module):
         h = h.reshape(h.shape[1], -1)
         h = self.layernorm(self.linear_layer(h))
         if self.active:
-            h = self.activation(h)
+            h = F.gelu(h)
             return h
         else:
             return h
