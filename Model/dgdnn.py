@@ -10,7 +10,7 @@ class DGDNN(nn.Module):
         super().__init__()
 
         # Allocate transition params
-        self.T     = nn.Parameter(torch.empty(layers,
+        self.T = nn.Parameter(torch.empty(layers,
                                               expansion_step,
                                               num_nodes,
                                               num_nodes))
