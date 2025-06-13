@@ -2,22 +2,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class CatMultiAttn(torch.nn.Module):
-    def __init__(self, embedding, num_heads, output, active, timestamp):
-        super(CatMultiAttn, self).__init__()
-        self.attn_layer = nn.MultiheadAttention(embedding, num_heads)
-        self.linear_layer = nn.Linear(embedding*timestamp, output*timestamp)
+class CatMultiAttn(nn.Module):
+    def __init__(self, embed_dim, num_heads, output, active, timestamp):
+        super().__init__()
         self.active = active
-        self.timestamp = timestamp
-        self.layernorm = nn.functional.layer_norm
+        self.attn     = nn.MultiheadAttention(embed_dim, num_heads)
+        self.linear   = nn.Linear(embed_dim * timestamp, output * timestamp)
+        self.norm     = nn.LayerNorm(output * timestamp)
 
-    def forward(self, h, h_prime):
-        h = torch.cat((h, h_prime), dim=1).view(self.timestamp, h.shape[0], -1)
-        h, _ = self.attn_layer(h, h, h)
-        h = h.reshape(h.shape[1], -1)
-        h = self.layernorm(self.linear_layer(h))
+    def forward(self, h: Tensor, h_prime: Tensor) -> Tensor:
+        """
+        h, h_prime: [B, timestamp, embedding]
+        returns:    [B, output * timestamp]
+        """
+        B = h.shape[0]
+
+        # 1) concat features
+        x = torch.cat([h, h_prime], dim=-1)        # [B, timestamp, 2*embedding]
+        # 2) Multi-Head Attn expects (seq, batch, embed)
+        x = x.permute(1, 0, 2)                     # [timestamp, B, 2*embedding]
+        x, _ = self.attn(x, x, x)
+        # 3) back to batch-first and flatten
+        x = x.permute(1, 0, 2).reshape(B, -1)      # [B, timestamp * 2*embedding]
+        # 4) project, norm, act
+        x = self.linear(x)                         # [B, output * timestamp]
+        x = self.norm(x)
         if self.active:
-            h = F.gelu(h)
-            return h
-        else:
-            return h
+            x = F.gelu(x)
+        return x
+
