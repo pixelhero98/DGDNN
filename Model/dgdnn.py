@@ -45,12 +45,11 @@ class DGDNN(nn.Module):
     def forward(self, X, A):
         z, h = X, X
         # Optionally constrain theta to be non-negative or sum-to-one:
-        theta_pos  = F.softplus(self.theta)             # >= 0
+        # opt1: theta_pos  = F.softplus(self.theta)             # >= 0
         theta_prob = F.softmax(self.theta, dim=-1)      # sum-to-1
 
         for l in range(self.T.shape[0]):
-            # pick whichever makes sense for your diffusion layer:
-            z = self.diffusion_layers[l](theta_pos[l], self.T[l], z, A)
+            z = self.diffusion_layers[l](theta_prob[l], self.T[l], z, A)
             h = self.cat_attn_layers[l](z, h)
 
         return self.linear(h)
