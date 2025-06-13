@@ -1,171 +1,171 @@
-import torch
-import math
-import csv
 import os
+import re
+import math
+import torch
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from typing import List, Tuple
-from tqdm import tqdm
 from torch.utils.data import Dataset
-from torch_geometric.data import Data
-from torch_geometric.utils import dense_to_sparse
 from scipy.linalg import expm
 
 
 class MyDataset(Dataset):
-    def __init__(self, root: str, desti: str, market: str, comlist: List[str], start: str, end: str, window: int, dataset_type: str, fast_approx):
-        super().__init()
+    """
+    A PyTorch Dataset for rolling-window graph snapshots of company time series.
 
-        self.comlist = comlist
+    Parameters:
+      - root (str): directory containing CSVs named {market}_{ticker}_30Y.csv
+      - dest (str): output directory for serialized graphs
+      - market (str): market code prefix in filenames (e.g., 'NASDAQ')
+      - start (str): inclusive window start date 'YYYY-MM-DD'
+      - end (str): inclusive window end date 'YYYY-MM-DD'
+      - window (int): number of past days T to use per graph
+      - mode (str, optional): subfolder label, e.g. 'train' or 'test' (default 'train')
+      - fast_approx (bool, optional): whether to use heat-kernel approximation (default False)
+
+    Automatically discovers tickers by scanning CSV filenames in `root`.
+
+    Graph dict entries:
+      - X: Tensor [N, F * T] node features (log1p of F=5 features over T days per node)
+      - A: Tensor [N, N] adjacency matrix (log-scaled or heat-kernel)
+      - Y: Tensor [N] integer labels (count of days price rose in window)
+
+    Example:
+      >>> dataset = MyDataset(
+      ...     root='data/csvs',
+      ...     dest='data/graphs',
+      ...     market='NASDAQ',
+      ...     start='2020-01-01',
+      ...     end='2020-12-31',
+      ...     window=10,
+      ... )
+    """
+    def __init__(
+        self,
+        root: str,
+        dest: str,
+        market: str,
+        start: str,
+        end: str,
+        window: int,
+        mode: str = 'train',
+        fast_approx: bool = False,
+    ):
+        super().__init__()
+        self.root, self.dest = root, dest
         self.market = market
-        self.root = root
-        self.desti = desti
-        self.start = start
-        self.end = end
+        self.start, self.end = pd.to_datetime(start), pd.to_datetime(end)
         self.window = window
-        self.dates, self.next_day = self.find_dates(start, end, root, comlist, market)
-        self.dataset_type = dataset_type
+        self.mode = mode
         self.fast_approx = fast_approx
-        # Check if graph files already exist
-        graph_files_exist = all(os.path.exists(os.path.join(desti, f'{market}_{dataset_type}_{start}_{end}_{window}/graph_{i}.pt')) for i in range(len(self.dates) - window + 1))
 
-        if not graph_files_exist:
-            # Generate the graphs and save them as PyTorch tensors
-            self._create_graphs(self.dates, desti, comlist, market, root, window)
+        # Discover tickers from filenames
+        pattern = re.compile(rf"^{re.escape(market)}_(.+)_30Y\.csv$")
+        self.tickers = []
+        for fname in os.listdir(root):
+            match = pattern.match(fname)
+            if match:
+                self.tickers.append(match.group(1))
+        self.tickers.sort()
+        N = len(self.tickers)
+
+        # Load each ticker's DataFrame once
+        self.data_frames = {}
+        for t in self.tickers:
+            path = os.path.join(root, f"{market}_{t}_30Y.csv")
+            df = pd.read_csv(path, parse_dates=[0], index_col=0)
+            df = df.loc[self.start:self.end]
+            self.data_frames[t] = df
+
+        # Common trading dates
+        common = set.intersection(*[set(df.index.normalize()) for df in self.data_frames.values()])
+        self.dates = sorted(common)
+
+        # Next common date after end
+        all_dates = set.intersection(*[
+            set(df.index.normalize().strftime('%Y-%m-%d'))
+            for df in self.data_frames.values()
+        ])
+        future = [d for d in all_dates if d > end]
+        self.next_day = min(future) if future else None
+
+        # Stack features: shape (n_dates, N, F)
+        feature_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+        self.features = np.stack([
+            self.data_frames[t][feature_cols].values for t in self.tickers
+        ], axis=1)
+
+        # Prepare output directory
+        out_dir = os.path.join(dest, f"{market}_{mode}_{self.start.date()}_{self.end.date()}_{window}")
+        os.makedirs(out_dir, exist_ok=True)
+
+        # Build graphs if missing
+        if not all(os.path.exists(os.path.join(out_dir, f"graph_{i}.pt"))
+                   for i in range(len(self.dates) - window)):
+            self._build_graphs(out_dir)
 
     def __len__(self):
-        
-        return len(self.dates) - self.window + 1
+        return len(self.dates) - self.window
 
-    def __getitem__(self, idx: int):
-        directory_path = os.path.join(self.desti, f'{self.market}_{self.dataset_type}_{self.start}_{self.end}_{self.window}')
-        data_path = os.path.join(directory_path, f'graph_{idx}.pt')
-        if os.path.exists(data_path):
-            
-            return torch.load(data_path)
-        else:
-            
-            raise FileNotFoundError(f"No graph data found for index {idx}")
+    def __getitem__(self, idx):
+        path = os.path.join(
+            self.dest,
+            f"{self.market}_{self.mode}_{self.start.date()}_{self.end.date()}_{self.window}",
+            f"graph_{idx}.pt"
+        )
+        return torch.load(path)
 
-    def check_years(self, date_str: str, start_str: str, end_str: str) -> bool:
-        date_format = "%Y-%m-%d"
-        date = datetime.strptime(date_str, date_format)
-        start = datetime.strptime(start_str, date_format)
-        end = datetime.strptime(end_str, date_format)
-        
-        return start <= date <= end
+    @staticmethod
+    def _entropy(arr: np.ndarray) -> float:
+        vals, counts = np.unique(arr, return_counts=True)
+        p = counts / counts.sum()
+        return -np.sum(p * np.log(p + 1e-12))
 
-    def find_dates(self, start: str, end: str, path: str, comlist: List[str], market: str) -> Tuple[List[str], str]:
-        date_sets = []
-        after_end_date_sets = []
-
-        for h in comlist:
-            dates = set()
-            after_end_dates = set()
-            d_path = os.path.join(path, f'{market}_{h}_30Y.csv')
-
-            with open(d_path) as f:
-                file = csv.reader(f)
-                next(file, None)  # Skip the header row
-                for line in file:
-                    date_str = line[0][:10]
-
-                    if self.check_years(date_str, start, end):
-                        dates.add(date_str)
-                    elif self.check_years(date_str, end, '2017-12-31'):  # '2017-12-31' is just an example, replacing with the latest date when datasets change
-                        after_end_dates.add(date_str)
-
-            date_sets.append(dates)
-            after_end_date_sets.append(after_end_dates)
-
-        all_dates = list(set.intersection(*date_sets))
-        all_after_end_dates = list(set.intersection(*after_end_date_sets))
-        next_common_day = min(all_after_end_dates) if all_after_end_dates else None
-
-        return sorted(all_dates), next_common_day
-
-    def signal_energy(self, x_tuple: Tuple[float]) -> float:
-        x = np.array(x_tuple)
-        
-        return np.sum(np.square(x))
-
-    def information_entropy(self, x_tuple: Tuple[float]) -> float:
-        x = np.array(x_tuple)
-        unique, counts = np.unique(x, return_counts=True)
-        probabilities = counts / np.sum(counts)
-        entropy = -np.sum(probabilities * np.log(probabilities))
-        
-        return entropy
-
-    def adjacency_matrix(self, X: torch.Tensor) -> torch.Tensor:
-        A = torch.zeros((X.shape[0], X.shape[0]))
-        X = X.numpy()
-        energy = np.array([self.signal_energy(tuple(x)) for x in X])
-        entropy = np.array([self.information_entropy(tuple(x)) for x in X])
-
-        for i in range(X.shape[0]):
-            for j in range(X.shape[0]):
-                concat_x = np.concatenate((X[i], X[j]))
-                A[i, j] = torch.tensor((energy[i] / energy[j]) * (math.exp(entropy[i] + entropy[j] - self.information_entropy(tuple(concat_x)))), dtype=torch.float32)
-                
+    def _adjacency(self, window_slice: np.ndarray) -> torch.Tensor:
         if self.fast_approx:
             t = 5
-            A = A.numpy()
-            num_nodes = A.shape[0]
-            A_tilde = A + np.eye(num_nodes)
-            D_tilde = np.diag(1 / np.sqrt(A.sum(axis=1)))
-            H = D_tilde @ A @ D_tilde
-            return expm(-t * (np.eye(num_nodes) - H))
-            
-        A[A<1] = 1
+            A_tilde = A + np.eye(N)
+            D_inv_sqrt = np.diag(1.0 / np.sqrt(A.sum(axis=1) + 1e-12))
+            H = D_inv_sqrt @ A @ D_inv_sqrt
+            A = expm(-t * (np.eye(N) - H))
+            return torch.from_numpy(A.astype(np.float32))
+        else:
+            T = self.window
+            N = window_slice.shape[1]
+            # Flatten per-node: log1p, reorder to (N, T*F)
+            X = window_slice.transpose(1, 0, 2).reshape(N, -1)
+            X = np.log1p(X)
         
-        return torch.log(A)
+            energy = np.einsum('ij,ij->i', X, X)
+            entropy = np.apply_along_axis(self._entropy, 1, X)
+            e_ratio = energy[:, None] / (energy[None, :] + 1e-12)
+            ent_sum = entropy[:, None] + entropy[None, :]
+        
+            # Joint entropy
+            X_pair = np.concatenate([
+                X[:, None, :].repeat(N, axis=1),
+                X[None, :, :].repeat(N, axis=0)
+            ], axis=-1)
+            joint_ent = np.apply_along_axis(self._entropy, 2, X_pair)
+        
+            A = e_ratio * np.exp(ent_sum - joint_ent)
+            A = np.maximum(A, 1.0)
 
-    def node_feature_matrix(self, dates: List[str], comlist: List[str], market: str, path: str) -> torch.Tensor:
-        dates_dt = [pd.to_datetime(date).date() for date in dates]
-        X = torch.zeros((5, len(comlist), len(dates_dt)))
+        return torch.from_numpy(np.log(A).astype(np.float32))
 
-        for idx, h in enumerate(comlist):
-            d_path = os.path.join(path, f'{market}_{h}_30Y.csv')
-            df = pd.read_csv(d_path, parse_dates=[0], index_col=0)
-            df.index = df.index.astype(str).str.split(" ").str[0]
-            df.index = pd.to_datetime(df.index)
-            df = df[df.index.isin(dates_dt)]
-            df_T = df.transpose()
-            df_selected = df_T.iloc[0:5]
-            X[:, idx, :] = torch.from_numpy(df_selected.to_numpy())
+    def _build_graphs(self, out_dir: str):
+        n = len(self.dates)
+        N = len(self.tickers)
+        for i in range(n - self.window):
+            idxs = [self.dates.index(d) for d in self.dates[i:i + self.window + 1]]
+            data_slice = self.features[idxs]  # shape (T+1, N, F)
 
-        return X
+            # Labels: count of days close price rose
+            closes = data_slice[:, :, 3]
+            Y = (closes[1:] > closes[:-1]).sum(axis=0).astype(np.int64)
 
-    def _create_graphs(self, dates: List[str], desti: str, comlist: List[str], market: str, root: str, window: int):
-            dates.append(self.next_day)
-    
-            for i in tqdm(range(len(dates) - window + 1)):
-                directory_path = os.path.join(desti, f'{market}_{self.dataset_type}_{self.start}_{self.end}_{window}')
-                filename = os.path.join(directory_path, f'graph_{i}.pt')
-    
-                if os.path.exists(filename):
-                    print(f"Graph {i}/{len(dates) - window + 1} already exists, skipping...")
-                    continue
-    
-                print(f'Generating graph {i}/{len(dates) - window + 1}...')
-    
-                box = dates[i:i + window + 1]
-                X = self.node_feature_matrix(box, comlist, market, root)
-                C = torch.zeros(X.shape[1])
-    
-                for j in range(C.shape[0]):
-                    if X[3, j, -1] - X[3, j, -2] > 0:
-                        C[j] = 1
-    
-                X = X[:, :, :-1]
-                X_dim = [X.shape[0], X.shape[-1]]
-                X = X.view(-1, X_dim[-1])
-                X = torch.chunk(X, X_dim[0], dim=0)
-                X = torch.cat(X, dim=1)
-                X = torch.Tensor(np.log1p(X.numpy()))
-                edge_index, edge_attr = dense_to_sparse(self.adjacency_matrix(X))
-                data = Data(x=X, edge_index=edge_index, edge_attr=edge_attr, y=C.long())
-                os.makedirs(directory_path, exist_ok=True)
-                torch.save(data, filename)
+            A = self._adjacency(data_slice[:-1])
+            W = data_slice[:-1]
+            X = torch.from_numpy(np.log1p(W.transpose(1, 0, 2).reshape(N, -1)).astype(np.float32))
+
+            torch.save({'X': X, 'A': A, 'Y': torch.from_numpy(Y)},
+                       os.path.join(out_dir, f"graph_{i}.pt"))
