@@ -47,7 +47,7 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate
 
 
 # Define model
-layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, False, False, False, False, False], 19, 2
+layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, True, True, True, False, False], 19, 2
 diffusion_size = [5*timestamp, 31*timestamp, 28*timestamp, 24*timestamp, 20*timestamp, 16*timestamp, 12*timestamp]
 emb_size = [5 + 31, 64, 28 + 64, 50,
             24 + 50, 38, 20 + 38, 24,
