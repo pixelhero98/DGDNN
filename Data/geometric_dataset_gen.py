@@ -16,13 +16,12 @@ class MyDataset(Dataset):
       - root (str): directory containing CSVs named {market}_{ticker}_30Y.csv
       - dest (str): output directory for serialized graphs
       - market (str): market code prefix in filenames (e.g., 'NASDAQ')
+      - tickers (list[str]): list of ticker symbols to include as nodes (e.g., ['AAPL','MSFT'])
       - start (str): inclusive window start date 'YYYY-MM-DD'
       - end (str): inclusive window end date 'YYYY-MM-DD'
       - window (int): number of past days T to use per graph
       - mode (str, optional): subfolder label, e.g. 'train' or 'test' (default 'train')
       - fast_approx (bool, optional): whether to use heat-kernel approximation (default False)
-
-    Automatically discovers tickers by scanning CSV filenames in `root`.
 
     Graph dict entries:
       - X: Tensor [N, F * T] node features (log1p of F=5 features over T days per node)
@@ -34,6 +33,7 @@ class MyDataset(Dataset):
       ...     root='data/csvs',
       ...     dest='data/graphs',
       ...     market='NASDAQ',
+      ...     tickers=['AAPL','MSFT','GOOG'],
       ...     start='2020-01-01',
       ...     end='2020-12-31',
       ...     window=10,
@@ -44,6 +44,7 @@ class MyDataset(Dataset):
         root: str,
         dest: str,
         market: str,
+        tickers: list[str],
         start: str,
         end: str,
         window: int,
@@ -53,20 +54,11 @@ class MyDataset(Dataset):
         super().__init__()
         self.root, self.dest = root, dest
         self.market = market
+        self.tickers = tickers
         self.start, self.end = pd.to_datetime(start), pd.to_datetime(end)
         self.window = window
         self.mode = mode
         self.fast_approx = fast_approx
-
-        # Discover tickers from filenames
-        pattern = re.compile(rf"^{re.escape(market)}_(.+)_30Y\.csv$")
-        self.tickers = []
-        for fname in os.listdir(root):
-            match = pattern.match(fname)
-            if match:
-                self.tickers.append(match.group(1))
-        self.tickers.sort()
-        N = len(self.tickers)
 
         # Load each ticker's DataFrame once
         self.data_frames = {}
@@ -80,13 +72,18 @@ class MyDataset(Dataset):
         common = set.intersection(*[set(df.index.normalize()) for df in self.data_frames.values()])
         self.dates = sorted(common)
 
-        # Next common date after end
-        all_dates = set.intersection(*[
-            set(df.index.normalize().strftime('%Y-%m-%d'))
-            for df in self.data_frames.values()
-        ])
-        future = [d for d in all_dates if d > end]
-        self.next_day = min(future) if future else None
+        # Next common date after end, for label
+        # Reload full CSVs to access next day after end
+        self.next_day = None
+        after_sets = []
+        for t, df in self.data_frames.items():
+            full = pd.read_csv(os.path.join(root, f"{market}_{t}_30Y.csv"), parse_dates=[0], index_col=0)
+            full_dates = full.index.normalize().strftime('%Y-%m-%d')
+            after = [d for d in full_dates if d > end]
+            after_sets.append(set(after))
+        common_after = set.intersection(*after_sets)
+        if common_after:
+            self.next_day = min(common_after)
 
         # Stack features: shape (n_dates, N, F)
         feature_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -99,12 +96,13 @@ class MyDataset(Dataset):
         os.makedirs(out_dir, exist_ok=True)
 
         # Build graphs if missing
-        if not all(os.path.exists(os.path.join(out_dir, f"graph_{i}.pt"))
-                   for i in range(len(self.dates) - window)):
+        total = len(self.dates) - window + (1 if self.next_day else 0)
+        if not all(os.path.exists(os.path.join(out_dir, f"graph_{i}.pt")) for i in range(total)):
             self._build_graphs(out_dir)
 
     def __len__(self):
-        return len(self.dates) - self.window
+        total = len(self.dates) - self.window + (1 if self.next_day else 0)
+        return total
 
     def __getitem__(self, idx):
         path = os.path.join(
@@ -127,45 +125,59 @@ class MyDataset(Dataset):
             D_inv_sqrt = np.diag(1.0 / np.sqrt(A.sum(axis=1) + 1e-12))
             H = D_inv_sqrt @ A @ D_inv_sqrt
             A = expm(-t * (np.eye(N) - H))
+            
             return torch.from_numpy(A.astype(np.float32))
         else:
-            T = self.window
             N = window_slice.shape[1]
             # Flatten per-node: log1p, reorder to (N, T*F)
             X = window_slice.transpose(1, 0, 2).reshape(N, -1)
             X = np.log1p(X)
-        
+    
             energy = np.einsum('ij,ij->i', X, X)
             entropy = np.apply_along_axis(self._entropy, 1, X)
             e_ratio = energy[:, None] / (energy[None, :] + 1e-12)
             ent_sum = entropy[:, None] + entropy[None, :]
-        
-            # Joint entropy
+    
             X_pair = np.concatenate([
                 X[:, None, :].repeat(N, axis=1),
                 X[None, :, :].repeat(N, axis=0)
             ], axis=-1)
             joint_ent = np.apply_along_axis(self._entropy, 2, X_pair)
-        
+    
             A = e_ratio * np.exp(ent_sum - joint_ent)
             A = np.maximum(A, 1.0)
-
-        return torch.from_numpy(np.log(A).astype(np.float32))
+            
+            return torch.from_numpy(np.log(A).astype(np.float32))
 
     def _build_graphs(self, out_dir: str):
         n = len(self.dates)
-        N = len(self.tickers)
-        for i in range(n - self.window):
-            idxs = [self.dates.index(d) for d in self.dates[i:i + self.window + 1]]
-            data_slice = self.features[idxs]  # shape (T+1, N, F)
+        for i in range(n - self.window + (1 if self.next_day else 0)):
+            if i < len(self.dates) - self.window:
+                end_idx = i + self.window
+                slice_dates = self.dates[i:end_idx+1]
+            else:
+                slice_dates = self.dates[-self.window:] + [self.next_day]
+            idxs = [self.dates.index(d) if d in self.dates else None for d in slice_dates]
+            data_slice = []
+            for d, idx in zip(slice_dates, idxs):
+                if idx is not None:
+                    data_slice.append(self.features[idx])
+                else:
+                    df = pd.read_csv(os.path.join(self.root, f"{self.market}_{self.tickers[0]}_30Y.csv"), parse_dates=[0], index_col=0)
+                    row = df.loc[d, ['Open','High','Low','Close','Volume']].values
+                    data_slice.append(np.stack([row for _ in self.tickers], axis=0))
+            data_slice = np.stack(data_slice, axis=0)  # (T+1, N, F)
 
-            # Labels: count of days close price rose
+            # Label: compare last two days close
             closes = data_slice[:, :, 3]
-            Y = (closes[1:] > closes[:-1]).sum(axis=0).astype(np.int64)
+            if i < len(self.dates) - self.window:
+                Y = (closes[-1] > closes[-2]).astype(np.int64)
+            else:
+                Y = (closes[-1] > closes[-2]).astype(np.int64)
 
             A = self._adjacency(data_slice[:-1])
             W = data_slice[:-1]
+            N = W.shape[1]
             X = torch.from_numpy(np.log1p(W.transpose(1, 0, 2).reshape(N, -1)).astype(np.float32))
 
-            torch.save({'X': X, 'A': A, 'Y': torch.from_numpy(Y)},
-                       os.path.join(out_dir, f"graph_{i}.pt"))
+            torch.save({'X': X, 'A': A, 'Y': torch.from_numpy(Y)}, os.path.join(out_dir, f"graph_{i}.pt"))
