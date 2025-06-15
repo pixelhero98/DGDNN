@@ -10,6 +10,9 @@ class DGDNN(nn.Module):
         self,
         diffusion_size: list,     # e.g., [F0, F1, F2]
         embedding_size: list,     # e.g., [F1+F1, E1, E1+F2, E2, ...]
+        embedding_hidden_size: int,
+        embedding_output_size: int,
+        raw_feature_size: int,
         classes: int,
         layers: int,
         num_nodes: int,
@@ -32,17 +35,18 @@ class DGDNN(nn.Module):
         # Self-attention layers over concatenated feature matrices
         self.cat_attn_layers = nn.ModuleList([
             CatMultiAttn(
-                embed_dim=embedding_size[2 * i],        # e.g., input = concat[z, h] dim
+                input_time=embedding_size[i],        # e.g., input = concat[h, h_prime] dim
                 num_heads=num_heads,
-                output=embedding_size[2 * i + 1],       # output dim
-                use_activation=active[i],
-                timestamp=None                          # timestamp not used anymore
+                hidden_dim=embedding_hidden_size,      
+                output_dim=embedding_output_size,
+                use_activation=active[i]             
             )
-            for i in range(len(embedding_size) // 2)
+            for i in range(len(embedding_size))
         ])
-
+        # Transform raw features to be divisible by num_heads
+        self.raw_h_prime = nn.Linear(diffusion_size[0], raw_feature_size)
         # Final classifier
-        self.linear = nn.Linear(embedding_size[-1], classes)
+        self.linear = nn.Linear(embedding_output_size, classes)
 
         # Init transition weights
         self._init_transition_params()
@@ -59,40 +63,45 @@ class DGDNN(nn.Module):
         Returns:
             logits: [N, classes]
         """
-        z = X              # diffused features
-        h = X              # original features for attention fusion
-        theta_soft = F.softmax(self.theta, dim=-1)  # normalize per layer
+        h = X              # diffused features
+        h_prime = X              # original features for attention fusion
+        theta_soft = F.softmax(self.theta, dim=-1)  # normalize theta to summation of 1 per layer as the regularization
 
-        for l in range(len(self.diffusion_layers)):
+        for l in range(len(self.diffusion_layers) - 1):
             # Diffuse using learned linear combination of T_slices
-            z = self.diffusion_layers[l](theta_soft[l], self.T[l], z, A)  # [N, F_out]
+            h = self.diffusion_layers[l](theta_soft[l], self.T[l], h, A)  # [N, diffusion_size]
 
             # Combine with prior representation using CatMultiAttn
             if l == 0:
-                h = self.cat_attn_layers[l](z, h)  # [N, E]
-            else:
-                h = h + self.cat_attn_layers[l](z, h)
+                h_prime = self.cat_attn_layers[l](h, self.raw_h_prime(h_prime))  # [N, embedding_output_size]
             
+            else:
+                h_prime = h_prime + self.cat_attn_layers[l](h, h_prime)
+
         # Final projection to class logits
-        out = self.linear(h)  # [N, classes]
+        out = self.linear(h_prime)  # [N, classes]
         
         return out
 
 
-# For those who use fast implementation version.
+## For those who use fast implementation version.
+
 # class DGDNN(nn.Module):
 #     def __init__(
 #         self,
 #         diffusion_size: list,
 #         embedding_size: list,
+#         embedding_hidden_size: int,
+#         embedding_output_size: int,
+#         raw_feature_size: int,
 #         classes: int,
+#         layers: int,
 #         num_heads: int,
-#         active: list,
-#         layers: int
+#         active: list
 #     ):
 #         super().__init__()
 #         assert len(diffusion_size) - 1 == layers, "Mismatch in diffusion layers"
-#         assert len(embedding_size) // 2 == layers, "Mismatch in attention layers"
+#         assert len(embedding_size) == layers, "Mismatch in attention layers"
 
 #         self.layers = layers
 
@@ -103,15 +112,18 @@ class DGDNN(nn.Module):
 
 #         self.cat_attn_layers = nn.ModuleList([
 #             CatMultiAttn(
-#                 input_time=embedding_size[2 * i],      # concat size: z + h
+#                 input_time=embedding_size[i],        # e.g., input = concat[h, h_prime] dim
 #                 num_heads=num_heads,
-#                 hidden_dim=embedding_size[2 * i + 1],
-#                 use_activation=active[i]
+#                 hidden_dim=embedding_hidden_size,      
+#                 output_dim=embedding_output_size,
+#                 use_activation=active[i]             
 #             )
-#             for i in range(layers)
+#             for i in range(len(embedding_size))
 #         ])
-
-#         self.linear = nn.Linear(embedding_size[-1], classes)
+#         # Transform raw features to be divisible by num_heads
+#         self.raw_h = nn.Linear(diffusion_size[0], raw_feature_size)
+        
+#         self.linear = nn.Linear(embedding_output_size, classes)
 
 #     def forward(self, X: torch.Tensor, A: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
 #         """
@@ -129,7 +141,7 @@ class DGDNN(nn.Module):
 #         for l in range(self.layers):
 #             z = self.diffusion_layers[l](z, A, W)  # GeneralizedGraphDiffusion (e.g. GCNConv)
 #             if l == 0:
-#                 h = self.cat_attn_layers[l](z, h)
+#                 h = self.cat_attn_layers[l](z, self.raw_h(h))
 #             else:
 #                 h = h + self.cat_attn_layers[l](z, h)
 
