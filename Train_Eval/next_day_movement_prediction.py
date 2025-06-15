@@ -90,7 +90,7 @@ for epoch in range(epochs):
         C = C.to(device)  # label vector
         optimizer.zero_grad()
         out = model(X, A)
-        objective = F.cross_entropy(out, C) # to fast implement can omit the two regularization terms + theta_regularizer(model.theta) - 0.0029 * neighbor_distance_regularizer(model.theta)
+        objective = F.cross_entropy(out, C) # for efficiency can omit the regularization term - 0.0029 * neighbor_distance_regularizer(model.theta)
         objective.backward()
         optimizer.step()
         objective_total += objective.item()
