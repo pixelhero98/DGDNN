@@ -9,7 +9,7 @@ class CatMultiAttn(nn.Module):
         self,
         input_time: int,       # T1 + T2
         num_heads: int,
-        hidden_dim: int,       # E_h
+        hidden_dim: int,       
         output_dim: int,
         use_activation: bool
     ):
