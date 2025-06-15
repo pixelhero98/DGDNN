@@ -100,7 +100,7 @@ for epoch in range(epochs):
         correct += int((out == C).sum()).item()
         total += C.shape[0]
     if epoch % 1 == 0:
-            print(f"Epoch {epoch}: loss={objective_total:.4f}, acc={correct / total:.4f}")
+            print(f"Epoch {epoch}: train_loss={objective_total:.4f}, train_acc={correct / total:.4f}")
 
 # Validation
 model.eval()
