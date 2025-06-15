@@ -1,36 +1,27 @@
-import torch
-import torch.nn as nn
-
 class GeneralizedGraphDiffusion(nn.Module):
-    def __init__(self, input_dim, output_dim, active):
+    def __init__(self, input_dim: int, output_dim: int, active: bool):
         super().__init__()
-        self.fc         = nn.Linear(input_dim, output_dim)
-        self.activation = nn.PReLU(num_parameters=output_dim)
-        self.active     = active
+        self.fc = nn.Linear(input_dim, output_dim)
+        self.activation = nn.PReLU(num_parameters=input_dim) if active else nn.Identity()
 
-    def forward(self,
-                theta: torch.Tensor,    # [S]
-                T_slices: torch.Tensor, # [S, N, N]
-                x: torch.Tensor,        # [N, F_in]
-                a: torch.Tensor         # [N, N]
-               ) -> torch.Tensor:       # [N, F_out]
+    def forward(
+        self,
+        theta: Tensor,        # [S]
+        T_slices: Tensor,     # [S, N, N]
+        x: Tensor,            # [N, F_in]
+        a: Tensor             # [N, N]
+    ) -> Tensor:              # [N, F_out]
 
-        # 1) build the weighted diffusion matrix q (N×N)
-        #    q[i,j] = sum_s theta[s] * T_slices[s, i, j]
-        q = torch.einsum('s,sij->ij', theta, T_slices)
+        q = torch.einsum('s,sij->ij', theta, T_slices)  # [N, N]
+        q = q * a                                       # [N, N]
 
-        # 2) elementwise combine with adjacency, then propagate:
-        #    (q * a) is N×N, multiply into x: (N×N) @ (N×F_in) → N×F_in
-        out = (q * a) @ x
-        
-        # 3) optional nonlinearity
-        if self.active:
-            out = self.activation(out)
-            
-        # 4) project to output features
-        out = self.fc(out)
-                   
+        q = q.to_sparse()
+        out = torch.sparse.mm(q, x)                    # [N, F_in]
+
+        out = self.activation(out)
+        out = self.fc(out)                             # [N, F_out]
         return out
+
 
 # you can use the below for fast implementation if computational resources are limited.
 #class GeneralizedGraphDiffusion(torch.nn.Module):
