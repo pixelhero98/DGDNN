@@ -23,18 +23,24 @@ class GeneralizedGraphDiffusion(nn.Module):
         return out
 
 
-# you can use the below for fast implementation if computational resources are limited.
-#class GeneralizedGraphDiffusion(torch.nn.Module):
-    #def __init__(self, input_dim, output_dim, active):
-        #super(GeneralizedGraphDiffusion, self).__init__()
-        #self.output = output_dim
-        #self.gconv = GCNConv(input_dim, output_dim)
-        #self.activation0 = torch.nn.PReLU()
-        #self.active = active
+# Fast version using GCNConv for efficiency
+# from torch_geometric.nn import GCNConv
+# import torch.nn as nn
+# import torch
 
-    #def forward(self, x, a, w):
-        #x = self.gconv(x, a, w)
-        #if self.active:
-            #x = self.activation0(x)
+# class GeneralizedGraphDiffusion(nn.Module):
+#     def __init__(self, input_dim, output_dim, active: bool):
+#         super().__init__()
+#         self.gconv = GCNConv(input_dim, output_dim)
+#         self.activation = nn.PReLU(num_parameters=output_dim) if active else nn.Identity()
 
-        #return x
+#     def forward(
+#         self,
+#         x: torch.Tensor,                  # [N, F_in]
+#         edge_index: torch.Tensor,        # [2, E] COO format
+#         edge_weight: torch.Tensor        # [E] edge weights (like q_ij values)
+#     ) -> torch.Tensor:
+#         x = self.gconv(x, edge_index, edge_weight)  # [N, F_out]
+#         x = self.activation(x)
+#         return x
+
