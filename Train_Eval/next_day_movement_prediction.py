@@ -16,7 +16,9 @@ from sklearn.metrics import matthews_corrcoef, f1_score
 # Configure the device for running the model on GPU or CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 # Configure the default variables // # these can be tuned // # examples
+fast_approx = False # True for fast approximation and implementation
 sedate = ['2013-01-01', '2014-12-31']  # these can be tuned
 val_sedate = ['2015-01-01', '2015-06-30'] # these can be tuned
 test_sedate = ['2015-07-01', '2017-12-31'] # these can be tuned
@@ -27,7 +29,6 @@ com_path = ['/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/NASDAQ.cs
             '/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/NYSE_missing.csv']
 des = '/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/raw_stock_data/stocks_indicators/data'
 directory = "/content/drive/MyDrive/Raw_Data/Stock_Markets/NYSE_NASDAQ/raw_stock_data/stocks_indicators/data/google_finance"
-
 NASDAQ_com_list = []
 NYSE_com_list = []
 NYSE_missing_list = []
@@ -38,7 +39,7 @@ for idx, path in enumerate(com_path):
         for line in file:
             com_list[idx].append(line[0])  # append first element of line if each line is a list
 NYSE_com_list = [com for com in NYSE_com_list if com not in NYSE_missing_list]
-fast_approx = False # True for fast approximation and implementation
+
 
 # Generate datasets
 train_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, sedate[0], sedate[1], 19, dataset_type[0], fast_approx)
@@ -47,39 +48,33 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate
 
 
 # Define model
-layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, True, True, True, False, False], 19, 2
-diffusion_size = [5*timestamp, 31*timestamp, 28*timestamp, 24*timestamp, 20*timestamp, 16*timestamp, 12*timestamp]
-emb_size = [5 + 31, 64, 28 + 64, 50,
-            24 + 50, 38, 20 + 38, 24,
-            16 + 24, 12, 12+12, 10]  
-model = DGDNN(diffusion_size, emb_size, classes, layers, num_nodes, expansion_step, num_heads, active, timestamp).to(device)
+layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, True, True, True, True, True], 19, 2
+diffusion_size = [95, 64, 128, 256, 256, 256, 128]
+emb_size = [64 + 64, 128 + 256, 256 + 256, 256 + 256, 256 + 256, 128 + 256]  
+emb_hidden_size, emb_output_size, raw_feature_size = 1024, 256, 64
+model = DGDNN(diffusion_size, emb_size, emb_hidden_size, emb_output_size, raw_feature_size, classes, layers, num_nodes, expansion_step, num_heads, active).to(device)
 
 # Pass model GPU
 model = model.to(device)
 
+
 # Define optimizer and objective function
-def theta_regularizer(theta):
-    row_sums = torch.sum(theta, dim=-1)
-    ones = torch.ones_like(row_sums)
-    return torch.sum(torch.abs(row_sums - ones))
-
-def neighbor_distance_regularizer(theta):
-    box = torch.sum(theta, dim=-1)
-    result = torch.zeros_like(theta)
-
-    for idx, row in enumerate(theta):
-        for i, j in enumerate(row):
-            result[idx, i] = i * j
-
-    result_sum = torch.sum(result, dim=1)
-    return torch.sum(result / result_sum[:, None])
-
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1.5e-5)
 
-# Define training process & validation process & testing process
+# def neighbor_distance_regularizer(theta):
+#     box = torch.sum(theta, dim=-1)
+#     result = torch.zeros_like(theta)
 
+#     for idx, row in enumerate(theta):
+#         for i, j in enumerate(row):
+#             result[idx, i] = i * j
+
+#     result_sum = torch.sum(result, dim=1)
+#     return torch.sum(result / result_sum[:, None])
+
+
+# Define training process & validation process & testing process
 epochs = 6000
-model.reset_parameters()
 
 # Training
 for epoch in range(epochs):
@@ -104,8 +99,8 @@ for epoch in range(epochs):
         out = out.argmax(dim=1)
         correct += int((out == C).sum()).item()
         total += C.shape[0]
-        if epoch % 1 == 0:
-          print(f"Epoch {epoch}: loss={objective_total:.4f}, acc={correct / total:.4f}")
+    if epoch % 1 == 0:
+            print(f"Epoch {epoch}: loss={objective_total:.4f}, acc={correct / total:.4f}")
 
 # Validation
 model.eval()
