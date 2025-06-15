@@ -97,7 +97,7 @@ for epoch in range(epochs):
 
     # If performance progress of the model is required
         out = out.argmax(dim=1)
-        correct += int((out == C).sum()).item()
+        correct += int((out == C).sum())
         total += C.shape[0]
     if epoch % 1 == 0:
             print(f"Epoch {epoch}: train_loss={objective_total:.4f}, train_acc={correct / total:.4f}")
