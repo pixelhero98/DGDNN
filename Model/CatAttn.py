@@ -23,6 +23,7 @@ class CatMultiAttn(nn.Module):
         self.use_activation = use_activation
 
         self.attn = nn.MultiheadAttention(embed_dim=input_time, num_heads=num_heads)
+        self.norm = nn.LayerNorm(input_time)  # Apply norm on attention output
 
         self.proj = nn.Sequential(
             nn.Linear(input_time, hidden_dim),
@@ -37,16 +38,15 @@ class CatMultiAttn(nn.Module):
             h_prime (Tensor): [N, T2]
 
         Returns:
-            Tensor: [N, hidden_dim] — per-series representation
+            Tensor: [N, 256] — per-series representation
         """
         assert h.shape[0] == h_prime.shape[0], "Number of time series (N) must match."
         x = torch.cat([h, h_prime], dim=1)              # [N, T1 + T2]
+        x = x.unsqueeze(1).transpose(0, 1)              # [1, N, T]
 
-        x = x.unsqueeze(1)                              # [N, 1, T]
-        x = x.transpose(0, 1)                           # [1, N, T] → N is "sequence"
+        attn_out, _ = self.attn(x, x, x)                # [1, N, T]
+        attn_out = self.norm(attn_out)                  # [1, N, T]
 
-        x, _ = self.attn(x, x, x)                       # [1, N, T]
-        x = x.squeeze(0)                                # [N, T]
+        x = attn_out.squeeze(0)                         # [N, T]
         x = self.proj(x)                                # [N, 256]
-
         return x
