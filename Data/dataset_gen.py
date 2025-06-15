@@ -144,8 +144,8 @@ class MyDataset(Dataset):
             ], axis=-1)
             joint_ent = np.apply_along_axis(self._entropy, 2, X_pair)
     
-            A = e_ratio * np.exp(ent_sum - joint_ent)
-            A = np.maximum(A, 1.0)
+            A = e_ratio * (np.exp(ent_sum - joint_ent) - 1)
+            A[A < 1.0] = 0.0 # can tune 1.0 to other values to perform sparsification
             
             return torch.from_numpy(np.log(A).astype(np.float32))
 
