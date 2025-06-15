@@ -1,3 +1,6 @@
+import torch.nn as nn
+import torch
+
 class GeneralizedGraphDiffusion(nn.Module):
     def __init__(self, input_dim: int, output_dim: int, active: bool):
         super().__init__()
