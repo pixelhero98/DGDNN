@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from GGD import GeneralizedGraphDiffusion
-from CATATTN import CatMultiAttn
+from ggd import GeneralizedGraphDiffusion
+from catattn import CatMultiAttn
 
 
 class DGDNN(nn.Module):
