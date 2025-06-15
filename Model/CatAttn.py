@@ -10,6 +10,7 @@ class CatMultiAttn(nn.Module):
         input_time: int,       # T1 + T2
         num_heads: int,
         hidden_dim: int,       # E_h
+        output_dim: int,
         use_activation: bool
     ):
         """
@@ -28,7 +29,7 @@ class CatMultiAttn(nn.Module):
         self.proj = nn.Sequential(
             nn.Linear(input_time, hidden_dim),
             nn.GELU() if use_activation else nn.Identity(),
-            nn.Linear(hidden_dim, 256)
+            nn.Linear(hidden_dim, output_dim)
         )
 
     def forward(self, h: Tensor, h_prime: Tensor) -> Tensor:
@@ -38,7 +39,7 @@ class CatMultiAttn(nn.Module):
             h_prime (Tensor): [N, T2]
 
         Returns:
-            Tensor: [N, 256] — per-series representation
+            Tensor: [N, output_dim] — per-series representation
         """
         assert h.shape[0] == h_prime.shape[0], "Number of time series (N) must match."
         x = torch.cat([h, h_prime], dim=1)              # [N, T1 + T2]
@@ -48,5 +49,5 @@ class CatMultiAttn(nn.Module):
         attn_out = self.norm(attn_out)                  # [1, N, T]
 
         x = attn_out.squeeze(0)                         # [N, T]
-        x = self.proj(x)                                # [N, 256]
+        x = self.proj(x)                                # [N, output_dim]
         return x
