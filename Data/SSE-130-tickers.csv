@@ -1,0 +1,131 @@
+index,Company Name,SSE Stock Code,GICS Sector,Market Capitalization (CNY B)
+1,"Kweichow Moutai Co., Ltd.",600519,Consumer Staples,"1,786.59"
+2,Industrial and Commercial Bank of China Ltd. (ICBC),601398,Financials,"1,785.49"
+3,Agricultural Bank of China Ltd.,601288,Financials,"1,745.70"
+4,Bank of China Ltd.,601988,Financials,"1,550.00"
+5,PetroChina Company Limited,601857,Energy,"1,531.08"
+6,"China Merchants Bank Co., Ltd.",600036,Financials,"1,188.70"
+7,China Life Insurance Company Limited,601628,Financials,983.64
+8,"Ping An Insurance (Group) Company of China, Ltd.",601318,Financials,942.4
+9,China Shenhua Energy Company Limited,601088,Energy,771.84
+10,"China Yangtze Power Co., Ltd.",600900,Utilities,735.24
+11,China Petroleum & Chemical Corporation (Sinopec),600028,Energy,628.37
+12,CITIC Securities Company Limited,600030,Financials,390.09
+13,"Industrial Bank Co., Ltd.",601166,Financials,524.3
+14,"Bank of Communications Co., Ltd.",601328,Financials,600
+15,"Postal Savings Bank of China Co., Ltd.",601658,Financials,475.57
+16,China State Construction Engineering Corporation Ltd.,601668,Industrials,236.16
+17,"China Pacific Insurance (Group) Co., Ltd.",601601,Financials,321.51
+18,Zijin Mining Group Company Limited,601899,Materials,524.9
+19,"Shanghai Pudong Development Bank Co., Ltd.",600000,Financials,427.96
+20,"Jiangsu Hengrui Pharmaceuticals Co., Ltd.",600276,Health Care,350.57
+21,China CITIC Bank Corporation Limited,601998,Financials,382.7
+22,"Haier Smart Home Co., Ltd.",600690,Consumer Discretionary,226.85
+23,SAIC Motor Corporation Limited,600104,Consumer Discretionary,188.45
+24,"Inner Mongolia Yili Industrial Group Co., Ltd.",600887,Consumer Staples,176.77
+25,China United Network Communications Limited,600050,Communication Services,162.66
+26,"Sany Heavy Industry Co., Ltd.",600031,Industrials,153.07
+27,"China Minsheng Banking Corp., Ltd.",600016,Financials,213.58
+28,"Baoshan Iron & Steel Co., Ltd.",600019,Materials,154.1
+29,"NARI Technology Co., Ltd.",600406,Information Technology,181.98
+30,Great Wall Motor Company Limited,601633,Consumer Discretionary,138.85
+31,"Bank of Beijing Co., Ltd.",601169,Financials,148.85
+32,"Foshan Haitian Flavouring & Food Co., Ltd.",603288,Consumer Staples,231.25
+33,Shaanxi Coal Industry Company Limited,601225,Energy,192.1
+34,"Huatai Securities Co., Ltd.",601688,Financials,116.29
+35,Anhui Conch Cement Company Limited,600585,Materials,109.44
+36,"China Molybdenum Co., Ltd.",603993,Materials,123.72
+37,"LONGi Green Energy Technology Co., Ltd.",601012,Information Technology,110.35
+38,"Poly Developments and Holdings Group Co., Ltd.",600048,Real Estate,99.13
+39,CRRC Corporation Limited,601766,Industrials,169.42
+40,"Bank of Nanjing Co., Ltd.",601009,Financials,136.7
+41,"China Everbright Bank Co., Ltd.",601818,Financials,247.8
+42,"Fuyao Glass Industry Group Co., Ltd.",600660,Consumer Discretionary,145.7
+43,China Railway Group Limited,601390,Industrials,112.42
+44,"China Communications Construction Company, Ltd.",601800,Industrials,104.14
+45,New China Life Insurance Company Ltd.,601336,Financials,99.58
+46,Shanghai Electric Group Company Limited,601727,Industrials,91.42
+47,China Railway Construction Corporation Limited,601186,Industrials,89
+48,Air China Limited,601111,Industrials,122.44
+49,Aluminum Corporation of China Limited,601600,Materials,83.85
+50,"Power Construction Corporation of China, Ltd.",601669,Industrials,80.71
+51,"GD Power Development Co., Ltd.",600795,Utilities,84.18
+52,China Coal Energy Company Limited,601898,Energy,128.9
+53,China CSSC Holdings Limited,600150,Industrials,146.74
+54,"Daqin Railway Co., Ltd.",601006,Industrials,117.14
+55,"Shanghai International Port (Group) Co., Ltd.",600018,Industrials,127.57
+56,"Wanhua Chemical Group Co., Ltd.",600309,Materials,169
+57,"Guotai Junan Securities Co., Ltd.",601211,Financials,137.31
+58,"China Merchants Securities Co., Ltd.",600999,Financials,151.58
+59,"China Northern Rare Earth (Group) High-Tech Co., Ltd.",600111,Materials,88.6
+60,"TBEA Co., Ltd.",600089,Industrials,60.03
+61,"China Shipbuilding Industry Group Power Co., Ltd.",600482,Industrials,—
+62,AVIC Shenyang Aircraft Company Limited,600760,Industrials,—
+63,"Zhejiang Longsheng Group Co., Ltd.",600352,Materials,33.22
+64,Yankuang Energy Group Company Limited,600188,Energy,—
+65,"Shandong Gold Mining Co., Ltd.",600547,Materials,—
+66,Jiangsu Expressway Company Limited,600377,Industrials,—
+67,"Huaneng Power International, Inc.",600011,Utilities,—
+68,Huadian Power International Corporation Limited,600027,Utilities,—
+69,"AVIC Airborne Systems Co., Ltd.",600372,Industrials,—
+70,"China Jushi Co., Ltd.",600176,Industrials,—
+71,"Sichuan Chuantou Energy Co., Ltd.",600674,Utilities,78.04
+72,"Hengli Petrochemical Co., Ltd.",600346,Materials,—
+73,"Huafa Industrial Co., Ltd. Zhuhai",600325,Real Estate,13.33
+74,Shandong Hi-speed Company Limited,600350,Industrials,—
+75,"Zhejiang Zheneng Electric Power Co., Ltd.",600023,Utilities,—
+76,"Shanghai Fosun Pharmaceutical (Group) Co., Ltd.",600196,Health Care,59.95
+77,"Shengyi Technology Co., Ltd.",600183,Information Technology,67.2
+78,"Youngor Group Co., Ltd.",600177,Consumer Discretionary,33.7
+79,"Xiamen Tungsten Co., Ltd.",600549,Materials,32.83
+80,"COSCO SHIPPING Holdings Co., Ltd.",601919,Industrials,230.4
+81,Jiangxi Copper Company Limited,600362,Materials,68.86
+82,Zhongjin Gold Corporation Limited,600489,Materials,—
+83,Gemdale Corporation,600383,Real Estate,16.25
+84,"Shanghai Lujiazui Finance & Trade Zone Development Co., Ltd.",600663,Real Estate,—
+85,"China National Chemical Engineering Co., Ltd.",601117,Industrials,—
+86,"Tongwei Co., Ltd.",600438,Information Technology,—
+87,"YTO Express Group Co., Ltd.",600233,Industrials,—
+88,"Yutong Bus Co., Ltd.",600066,Consumer Discretionary,—
+89,"Hua Xia Bank Co., Limited",600015,Financials,130.02
+90,"Inner Mongolia BaoTou Steel Union Co., Ltd.",600010,Materials,80.16
+91,"Shanghai International Airport Co., Ltd.",600009,Industrials,78.56
+92,China Southern Airlines Company Limited,600029,Industrials,78.3
+93,"Beijing Tong Ren Tang Co., Ltd.",600085,Health Care,49.55
+94,"China Northern Rare Earth (Group) High-Tech Co., Ltd.",600111,Materials,88.6
+95,China Eastern Airlines Corporation Limited,600115,Industrials,81.85
+96,"China Spacesat Co., Ltd.",600118,Industrials,33.78
+97,"Shanxi Lanhua Sci-Tech Venture Co., Ltd.",600123,Energy,9.69
+98,"Chongqing Brewery Co., Ltd.",600132,Consumer Staples,26.76
+99,"China Sports Industry Group Co., Ltd.",600158,Consumer Discretionary,8.06
+100,"Zhejiang Juhua Co., Ltd.",600160,Materials,—
+101,"Beiqi Foton Motor Co., Ltd.",600166,Consumer Discretionary,—
+102,"Taiyuan Heavy Industry Co., Ltd.",600169,Industrials,8.26
+103,"Wolong New Energy Group Co., Ltd.",600173,Real Estate,4.07
+104,"Shanghai Fosun Pharmaceutical (Group) Co., Ltd.",600196,Health Care,59.95
+105,"Zhejiang Medicine Co., Ltd.",600216,Health Care,—
+106,"Shandong Nanshan Aluminum Co., Ltd.",600219,Materials,44.83
+107,"Hainan Airlines Holding Co., Ltd.",600221,Industrials,57.91
+108,"Yunnan Metropolitan Real Estate Development Co., Ltd.",600239,Real Estate,3.79
+109,"Beijing Vantone Real Estate Co., Ltd.",600246,Real Estate,11.02
+110,"Guangxi Wuzhou Zhongheng Group Co., Ltd.",600252,Health Care,—
+111,"Rising Nonferrous Metals Share Co., Ltd.",600259,Materials,16.64
+112,"Beijing Urban Construction Investment & Development Co., Ltd.",600266,Real Estate,—
+113,Aisino Corporation,600271,Information Technology,—
+114,"Shanghai Zhenhua Heavy Industries Co., Ltd.",600320,Industrials,23.18
+115,"Tianjin Realty Development (Group) Co., Ltd.",600322,Real Estate,3.14
+116,"Shan Xi Hua Yang Group New Energy Co., Ltd.",600348,Energy,24.68
+117,"Southwest Securities Co., Ltd.",600362,Financials,—
+118,"Beijing Capital Development Co., Ltd.",600376,Real Estate,—
+119,"Guizhou Panjiang Refined Coal Co., Ltd.",600395,Energy,—
+120,"Zhejiang China Commodities City Group Co., Ltd.",600415,Industrials,—
+121,"Anhui Jianghuai Automobile Group Corp., Ltd.",600418,Consumer Discretionary,—
+122,"Shandong Hualu-Hengsheng Chemical Co., Ltd.",600426,Materials,—
+123,"Zhangzhou Pientzehuang Pharmaceutical Co., Ltd.",600436,Health Care,—
+124,"Yunnan Chihong Zinc & Germanium Co., Ltd.",600497,Materials,—
+125,"Shanghai Datun Energy Resources Co., Ltd.",600508,Energy,—
+126,"Kangmei Pharmaceutical Co., Ltd.",600518,Health Care,26.34
+127,"FangDa Carbon New Material Co., Ltd.",600516,Materials,18.92
+128,China Railway Hi-tech Industry Corporation Limited,600528,Industrials,—
+129,"Offshore Oil Engineering Co., Ltd.",600583,Energy,24.54
+130,"JCET Group Co., Ltd.",600584,Information Technology,59.46
