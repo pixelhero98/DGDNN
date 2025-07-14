@@ -49,9 +49,31 @@ test_dataset = MyDataset(directory, des, market[0], NASDAQ_com_list, test_sedate
 
 # Define model
 layers, num_nodes, expansion_step, num_heads, active, timestamp, classes = 6, 1026, 7, 2, [True, True, True, True, True, True], 19, 2
-diffusion_size = [95, 64, 128, 256, 256, 256, 128]
-emb_size = [64 + 64, 128 + 256, 256 + 256, 256 + 256, 256 + 256, 128 + 256]  
 emb_hidden_size, emb_output_size, raw_feature_size = 1024, 256, 64
+diffusion_size = [timestamp * 5, 64, 128, 256, 256, 256, 128] 
+emb_size = [64 + 64, 128 + 256, 256 + 256, 256 + 256, 256 + 256, 128 + 256]
+if num_heads != 2:
+    # compute a scaling factor (float!) relative to your 2-head baseline
+    scale = num_heads / 2.0    # e.g. 3 / 2 = 1.5
+
+    # scale the scalar sizes
+    emb_output_size   = int(round(emb_output_size   * scale))
+    raw_feature_size  = int(round(raw_feature_size  * scale))
+
+    # leave the first element of diffusion_size unchanged,
+    # scale the rest via a list comprehension
+    diffusion_size = [
+        diffusion_size[0]
+    ] + [
+        int(round(x * scale))
+        for x in diffusion_size[1:]
+    ]
+
+    # similarly scale each per-layer emb_size
+    emb_size = [
+        int(round(x * scale))
+        for x in emb_size
+    ]
 model = DGDNN(diffusion_size, emb_size, emb_hidden_size, emb_output_size, raw_feature_size, classes, layers, num_nodes, expansion_step, num_heads, active).to(device)
 
 # Pass model GPU
