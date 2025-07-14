@@ -11,7 +11,7 @@ from matplotlib import cm
 from matplotlib import axes
 import seaborn as sns
 import sklearn.preprocessing as skp
-from sklearn.metrics import matthews_corrcoef, f1_score
+from sklearn.metrics import f1_score, matthews_corrcoef, accuracy_score
 
 # Configure the device for running the model on GPU or CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -126,44 +126,49 @@ for epoch in range(epochs):
 
 # Validation
 model.eval()
+all_preds = []
+all_trues = []
 
-# Define evaluation metrics
-# ACC, MCC, and F1
-acc = 0
-f1 = 0
-mcc = 0
+with torch.no_grad():
+    for sample in validation_dataset:
+        X, A, C = sample['X'], sample['A'], sample['Y']
+        logits = model(X, A)
+        preds = logits.argmax(dim=1).cpu().numpy()
+        trues = C.cpu().numpy()
 
-for idx, sample in enumerate(validation_dataset):
+        all_preds.extend(preds)
+        all_trues.extend(trues)
 
-    X = sample['X']  # node feature tensor
-    A = sample['A']  # adjacency tensor
-    C = sample['Y']  # label vector
-    out = model(X, A).argmax(dim=1)
+# compute metrics on the full flattened arrays
+acc = accuracy_score(all_trues, all_preds)
+f1  = f1_score(all_trues, all_preds, average='macro')      # or 'micro' / 'weighted'
+mcc = matthews_corrcoef(all_trues, all_preds)
 
-    acc += int((out == C).sum())
-    f1 += f1_score(C, out.cpu().numpy())
-    mcc += matthews_corrcoef(C, out.cpu().numpy())
-
-print(acc / (len(validation_dataset) * C.shape[0]))
-print(f1 / len(validation_dataset))
-print(mcc/ len(validation_dataset))
+print(f"Accuracy:  {acc:.4f}")
+print(f"F1 (macro): {f1:.4f}")
+print(f"MCC:        {mcc:.4f}")
 
 # Test
 
-acc = 0
-f1 = 0
-mcc = 0
+model.eval()
+all_preds = []
+all_trues = []
 
-for idx, sample in enumerate(test_dataset):
-    X = sample['X']  # node feature tensor
-    A = sample['A']  # adjacency tensor
-    C = sample['Y']  # label vector
-    out = model(X, A).argmax(dim=1)
+with torch.no_grad():
+    for sample in test_dataset:
+        X, A, C = sample['X'], sample['A'], sample['Y']
+        logits = model(X, A)
+        preds = logits.argmax(dim=1).cpu().numpy()
+        trues = C.cpu().numpy()
 
-    acc += int((out == C).sum())
-    f1 += f1_score(C, out.cpu().numpy())
-    mcc += matthews_corrcoef(C, out.cpu().numpy())
+        all_preds.extend(preds)
+        all_trues.extend(trues)
 
-print(acc / (len(test_dataset) * C.shape[0]))
-print(f1 / len(test_dataset))
-print(mcc / len(test_dataset))
+# now compute metrics on the *entire* flattened arrays
+acc = accuracy_score(all_trues, all_preds)
+f1  = f1_score(all_trues, all_preds, average='macro')      # or 'micro', 'weighted'
+mcc = matthews_corrcoef(all_trues, all_preds)
+
+print(f"Accuracy:  {acc:.4f}")
+print(f"F1 (macro): {f1:.4f}")
+print(f"MCC:       {mcc:.4f}")
