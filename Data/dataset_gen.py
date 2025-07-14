@@ -119,35 +119,39 @@ class MyDataset(Dataset):
         return -np.sum(p * np.log(p + 1e-12))
 
     def _adjacency(self, window_slice: np.ndarray) -> torch.Tensor:
+        N = window_slice.shape[1]
+        X = np.log1p(window_slice.transpose(1,0,2).reshape(N,-1))
+    
+        # compute energy & entropies
+        energy  = np.einsum('ij,ij->i', X, X)
+        entropy = np.apply_along_axis(self._entropy, 1, X)
+        e_ratio = energy[:,None] / (energy[None,:] + 1e-12)
+        ent_sum = entropy[:,None] + entropy[None,:]
+    
+        # joint entropy
+        X_pair = np.concatenate([
+            X[:,None,:].repeat(N,axis=1),
+            X[None,:,:].repeat(N,axis=0)
+        ], axis=-1)
+        joint_ent = np.apply_along_axis(self._entropy, 2, X_pair)
+    
+        A = e_ratio * (np.exp(ent_sum - joint_ent) - 1)
+    
         if self.fast_approx:
-            t = 5
             A_tilde = A + np.eye(N)
-            D_inv_sqrt = np.diag(1.0 / np.sqrt(A.sum(axis=1) + 1e-12))
-            H = D_inv_sqrt @ A @ D_inv_sqrt
-            A = expm(-t * (np.eye(N) - H))
-            
-            return torch.from_numpy(A.astype(np.float32))
+            D_inv_sqrt = np.diag(1.0 / np.sqrt(A_tilde.sum(axis=1) + 1e-12))
+            H = D_inv_sqrt @ A_tilde @ D_inv_sqrt
+            A = expm(-self.heat_tau * (np.eye(N) - H))
         else:
-            N = window_slice.shape[1]
-            # Flatten per-node: log1p, reorder to (N, T*F)
-            X = window_slice.transpose(1, 0, 2).reshape(N, -1)
-            X = np.log1p(X)
+            A[A < self.sparsify_threshold] = 0.0
+            A = np.log(A + self.log_eps)
     
-            energy = np.einsum('ij,ij->i', X, X)
-            entropy = np.apply_along_axis(self._entropy, 1, X)
-            e_ratio = energy[:, None] / (energy[None, :] + 1e-12)
-            ent_sum = entropy[:, None] + entropy[None, :]
+        # enforce symmetry & no self-loops
+        A = (A + A.T) / 2.0
+        np.fill_diagonal(A, 0.0)
     
-            X_pair = np.concatenate([
-                X[:, None, :].repeat(N, axis=1),
-                X[None, :, :].repeat(N, axis=0)
-            ], axis=-1)
-            joint_ent = np.apply_along_axis(self._entropy, 2, X_pair)
-    
-            A = e_ratio * (np.exp(ent_sum - joint_ent) - 1)
-            A[A < 1.0] = 0.0 # can tune 1.0 to other values to perform sparsification
-            
-            return torch.from_numpy(np.log(A).astype(np.float32))
+        return torch.from_numpy(A.astype(np.float32))
+
 
     def _build_graphs(self, out_dir: str):
         n = len(self.dates)
