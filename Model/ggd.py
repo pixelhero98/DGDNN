@@ -26,7 +26,7 @@ class GeneralizedGraphDiffusion(nn.Module):
         return out
 
 
-# Fast version using GCNConv for efficiency
+# Fast approximation version using GCNConv for efficiency
 # from torch_geometric.nn import GCNConv
 # import torch.nn as nn
 # import torch
