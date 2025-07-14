@@ -83,7 +83,7 @@ model = model.to(device)
 # Define optimizer and objective function
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1.5e-5)
 
-# def neighbor_distance_regularizer(theta): Replaced with softmax implementation in dgdnn.py
+# def neighbor_distance_regularizer(theta):
 #     box = torch.sum(theta, dim=-1)
 #     result = torch.zeros_like(theta)
 
