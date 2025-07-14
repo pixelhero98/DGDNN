@@ -21,12 +21,13 @@ class MyDataset(Dataset):
       - mode (str, optional): subfolder label, e.g. 'train' or 'test' (default 'train')
       - fast_approx (bool, optional): whether to use heat-kernel approximation (default False)
       - heat_tau (float, optional): time parameter for heat kernel (default 5.0)
-      - sparsify_threshold (float, optional): threshold for sparsification (default 1.0)
+      - sparsify_threshold (float, optional): threshold for sparsification (default 0.3)
       - log_eps (float, optional): epsilon added before log (default 1e-12)
+      - norm_eps (float, optional): epsilon added for numeric stability in z-score (default 1e-6)
 
     Graph dict entries:
-      - X: Tensor [N, F * T] node features (log1p of F=5 features over T days per node)
-      - A: Tensor [N, N] adjacency matrix (log-scaled or heat-kernel)
+      - X: Tensor [N, F * T] node features (log1p + z-score normalized)
+      - A: Tensor [N, N] adjacency matrix (entropy-energy or heat-kernel)
       - Y: Tensor [N] integer labels (days price rose in window)
     """
     def __init__(
@@ -43,6 +44,7 @@ class MyDataset(Dataset):
         heat_tau: float = 5.0,
         sparsify_threshold: float = 0.3,
         log_eps: float = 1e-12,
+        norm_eps: float = 1e-6,
     ):
         super().__init__()
         self.root = root
@@ -57,44 +59,37 @@ class MyDataset(Dataset):
         self.heat_tau = heat_tau
         self.sparsify_threshold = sparsify_threshold
         self.log_eps = log_eps
+        self.norm_eps = norm_eps
 
-        # Load full CSVs and slice in-range
+        # Load data_frames_full & in-range slice
         self.data_frames_full = {}
         self.data_frames = {}
         for t in self.tickers:
             path = os.path.join(root, f"{market}_{t}_30Y.csv")
             if not os.path.exists(path):
                 raise FileNotFoundError(f"CSV file for ticker {t} not found at {path}")
-            full_df = pd.read_csv(path, parse_dates=[0], index_col=0)
-            self.data_frames_full[t] = full_df
-            self.data_frames[t] = full_df.loc[self.start:self.end]
+            df = pd.read_csv(path, parse_dates=[0], index_col=0)
+            self.data_frames_full[t] = df
+            self.data_frames[t] = df.loc[self.start:self.end]
 
         # Common trading dates
         common = set.intersection(*[set(df.index.normalize()) for df in self.data_frames.values()])
         self.dates = sorted(common)
 
-        # Next common date after end, for label
-        self.next_day = None
-        after_sets = []
-        for full_df in self.data_frames_full.values():
-            norm = full_df.index.normalize()
-            after = set(norm[norm > self.end])
-            after_sets.append(after)
+        # Next common date after end for labeling
+        after_sets = [set(df.index.normalize()[df.index.normalize() > self.end]) for df in self.data_frames_full.values()]
         common_after = set.intersection(*after_sets)
-        if common_after:
-            self.next_day = min(common_after)
+        self.next_day = min(common_after) if common_after else None
 
-        # Stack features: shape (n_dates, N, F)
+        # Stack raw features: shape (n_dates, N, F)
         feature_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-        self.features = np.stack([
-            self.data_frames[t][feature_cols].values for t in self.tickers
-        ], axis=1)
+        self.features = np.stack([self.data_frames[t][feature_cols].values for t in self.tickers], axis=1)
 
-        # Prepare output directory
+        # Prepare output
         out_dir = os.path.join(dest, f"{market}_{mode}_{self.start.date()}_{self.end.date()}_{window}")
         os.makedirs(out_dir, exist_ok=True)
 
-        # Build graphs if missing
+        # Build if missing
         total = len(self.dates) - window + (1 if self.next_day else 0)
         if not all(os.path.exists(os.path.join(out_dir, f"graph_{i}.pt")) for i in range(total)):
             self._build_graphs(out_dir)
@@ -116,13 +111,13 @@ class MyDataset(Dataset):
         p = counts / counts.sum()
         return -np.sum(p * np.log(p + 1e-12))
 
-    def _adjacency(self, window_slice: np.ndarray) -> torch.Tensor:
-        N = window_slice.shape[1]
-        # Flatten per-node: log1p, reorder to (N, T*F)
-        X = np.log1p(window_slice.transpose(1, 0, 2).reshape(N, -1))
-
-        # compute energy & marginal entropies
-        energy  = np.einsum('ij,ij->i', X, X)
+    def _adjacency(self, X: np.ndarray) -> torch.Tensor:
+        """
+        Build adjacency from precomputed feature matrix X (N, T*F).
+        Uses entropy-energy and optional heat diffusion.
+        """
+        N = X.shape[0]
+        energy = np.einsum('ij,ij->i', X, X)
         entropy = np.apply_along_axis(self._entropy, 1, X)
         e_ratio = energy[:, None] / (energy[None, :] + self.log_eps)
         ent_sum = entropy[:, None] + entropy[None, :]
@@ -137,59 +132,55 @@ class MyDataset(Dataset):
         A = e_ratio * (np.exp(ent_sum - joint_ent) - 1)
 
         if self.fast_approx:
-            A_tilde = A + np.eye(N)
-            D_inv_sqrt = np.diag(1.0 / np.sqrt(A_tilde.sum(axis=1) + self.log_eps))
-            H = D_inv_sqrt @ A_tilde @ D_inv_sqrt
+            A_t = A + np.eye(N)
+            D_inv_sqrt = np.diag(1.0 / np.sqrt(A_t.sum(axis=1) + self.log_eps))
+            H = D_inv_sqrt @ A_t @ D_inv_sqrt
             A = expm(-self.heat_tau * (np.eye(N) - H))
         else:
             A[A < self.sparsify_threshold] = 0.0
             A = np.log(A + self.log_eps)
 
-        # enforce symmetry & no self-loops
         A = (A + A.T) / 2.0
         np.fill_diagonal(A, 0.0)
-
         return torch.from_numpy(A.astype(np.float32))
 
     def _build_graphs(self, out_dir: str):
         feature_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
         n = len(self.dates)
         for i in range(n - self.window + (1 if self.next_day else 0)):
-            # determine dates for features + label
+            # select dates
             if i < len(self.dates) - self.window:
-                slice_dates = self.dates[i:i + self.window + 1]
+                slice_dates = self.dates[i:i+self.window+1]
             else:
                 slice_dates = self.dates[-self.window:] + [self.next_day]
 
-            data_slice = []
+            # collect slices
+            data = []
             for d in slice_dates:
                 if d in self.dates:
                     idx = self.dates.index(d)
-                    data_slice.append(self.features[idx])
+                    data.append(self.features[idx])
                 else:
-                    # next_day: pull each ticker separately
-                    rows = [
-                        self.data_frames_full[t].loc[d, feature_cols].values
-                        for t in self.tickers
-                    ]
-                    data_slice.append(np.stack(rows, axis=0))
+                    rows = [self.data_frames_full[t].loc[d, feature_cols].values for t in self.tickers]
+                    data.append(np.stack(rows, axis=0))
+            slice_arr = np.stack(data, axis=0)  # (T+1, N, F)
 
-            data_slice = np.stack(data_slice, axis=0)  # (T+1, N, F)
+            # label
+            closes = slice_arr[:,:,3]
+            Y = (closes[-1]>closes[-2]).astype(np.int64)
 
-            # Label: compare last two days' Close
-            closes = data_slice[:, :, 3]
-            Y = (closes[-1] > closes[-2]).astype(np.int64)
-
-            # features and adjacency
-            A = self._adjacency(data_slice[:-1])
-            W = data_slice[:-1]
+            # features: log1p
+            W = slice_arr[:-1]
             N = W.shape[1]
-            X = torch.from_numpy(
-                np.log1p(W.transpose(1, 0, 2).reshape(N, -1)).astype(np.float32)
-            )
+            X_raw = np.log1p(W.transpose(1,0,2).reshape(N,-1))
+            # z-score normalize
+            mean = X_raw.mean(axis=1, keepdims=True)
+            std = X_raw.std(axis=1, keepdims=True) + self.norm_eps
+            X_norm = (X_raw - mean)/std
 
-            torch.save(
-                {'X': X, 'A': A, 'Y': torch.from_numpy(Y)},
-                os.path.join(out_dir, f"graph_{i}.pt")
-            )
+            # adjacency from normalized X
+            A = self._adjacency(X_norm)
+            X = torch.from_numpy(X_norm.astype(np.float32))
+
+            torch.save({'X':X,'A':A,'Y':torch.from_numpy(Y)}, os.path.join(out_dir,f"graph_{i}.pt"))
 
