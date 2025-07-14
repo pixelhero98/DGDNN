@@ -41,7 +41,7 @@ class MyDataset(Dataset):
         mode: str = 'train',
         fast_approx: bool = False,
         heat_tau: float = 5.0,
-        sparsify_threshold: float = 1.0,
+        sparsify_threshold: float = 0.3,
         log_eps: float = 1e-12,
     ):
         super().__init__()
