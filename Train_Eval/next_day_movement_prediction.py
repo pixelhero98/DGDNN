@@ -53,7 +53,7 @@ emb_hidden_size, emb_output_size, raw_feature_size = 1024, 256, 64
 diffusion_size = [timestamp * 5, 64, 128, 256, 256, 256, 128] 
 emb_size = [64 + 64, 128 + 256, 256 + 256, 256 + 256, 256 + 256, 128 + 256]
 if num_heads != 2:
-    # compute a scaling factor (float!) relative to your 2-head baseline
+    # compute a scaling factor (float!) relative to 2-head base
     scale = num_heads / 2.0    # e.g. 3 / 2 = 1.5
 
     # scale the scalar sizes
