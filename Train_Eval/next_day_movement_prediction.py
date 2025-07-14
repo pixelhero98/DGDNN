@@ -74,8 +74,8 @@ if num_heads != 2:
         int(round(x * scale))
         for x in emb_size
     ]
+            
 model = DGDNN(diffusion_size, emb_size, emb_hidden_size, emb_output_size, raw_feature_size, classes, layers, num_nodes, expansion_step, num_heads, active).to(device)
-
 # Pass model GPU
 model = model.to(device)
 
@@ -83,7 +83,7 @@ model = model.to(device)
 # Define optimizer and objective function
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1.5e-5)
 
-# def neighbor_distance_regularizer(theta):
+# def neighbor_distance_regularizer(theta): Replaced with softmax implementation in dgdnn.py
 #     box = torch.sum(theta, dim=-1)
 #     result = torch.zeros_like(theta)
 
