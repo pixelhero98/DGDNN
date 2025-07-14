@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 from ggd import GeneralizedGraphDiffusion
 from catattn import CatMultiAttn
 
@@ -21,6 +22,8 @@ class DGDNN(nn.Module):
         active: list              # bool per layer
     ):
         super().__init__()
+        assert len(diffusion_size) - 1 == layers, "diffusion_size length must equal layers + 1"
+        assert len(embedding_size) == layers, "embedding_size length must equal layers"
 
         # Transition matrices and weights
         self.T = nn.Parameter(torch.empty(layers, expansion_step, num_nodes, num_nodes))
@@ -28,60 +31,71 @@ class DGDNN(nn.Module):
 
         # Graph diffusion layers
         self.diffusion_layers = nn.ModuleList([
-            GeneralizedGraphDiffusion(diffusion_size[i], diffusion_size[i + 1], active[i])
-            for i in range(len(diffusion_size) - 1)
+            GeneralizedGraphDiffusion(
+                input_dim=diffusion_size[i],
+                output_dim=diffusion_size[i+1],
+                active=active[i]
+            ) for i in range(layers)
         ])
 
         # Self-attention layers over concatenated feature matrices
         self.cat_attn_layers = nn.ModuleList([
             CatMultiAttn(
-                input_time=embedding_size[i],        # e.g., input = concat[h, h_prime] dim
+                input_time=embedding_size[i],
                 num_heads=num_heads,
-                hidden_dim=embedding_hidden_size,      
+                hidden_dim=embedding_hidden_size,
                 output_dim=embedding_output_size,
-                use_activation=active[i]             
-            )
-            for i in range(len(embedding_size))
+                use_activation=active[i]
+            ) for i in range(layers)
         ])
-        # Transform raw features to be divisible by num_heads
+
+        # Transform raw features to match embedding_output_size
         self.raw_h_prime = nn.Linear(diffusion_size[0], raw_feature_size)
+
         # Final classifier
         self.linear = nn.Linear(embedding_output_size, classes)
 
-        # Init transition weights
+        # Initialize transition parameters
         self._init_transition_params()
 
     def _init_transition_params(self):
+        # Xavier init for transition matrices
         nn.init.xavier_uniform_(self.T)
-        nn.init.constant_(self.theta, 1.0 / self.theta.size(-1))  # normalize
+        # Uniform init for theta so coefficients sum to one
+        nn.init.constant_(self.theta, 1.0 / self.theta.size(-1))
 
-    def forward(self, X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: Tensor, A: Tensor) -> Tensor:
         """
         Args:
-            X: [N, F_in]  - node features
-            A: [N, N]     - adjacency matrix
+            X: [N, F0]  node features
+            A: [N, N]   adjacency matrix
         Returns:
             logits: [N, classes]
         """
-        h = X              # diffused features
-        h_prime = X              # original features for attention fusion
-        theta_soft = F.softmax(self.theta, dim=-1)  # normalize theta to summation of 1 per layer as the regularization
+        N = X.size(0)
+        theta_soft = F.softmax(self.theta, dim=-1)  # [layers, expansion_step]
 
-        for l in range(len(self.diffusion_layers) - 1):
-            # Diffuse using learned linear combination of T_slices
-            h = self.diffusion_layers[l](theta_soft[l], self.T[l], h, A)  # [N, diffusion_size]
+        # Initial representations
+        h = X.clone()
+        h_prime = X.clone()
 
-            # Combine with prior representation using CatMultiAttn
+        for l in range(len(self.diffusion_layers)):
+            # Diffusion step
+            t_l = theta_soft[l]            # [expansion_step]
+            T_l = self.T[l]               # [expansion_step, N, N]
+            h = self.diffusion_layers[l](t_l, T_l, h, A)  # [N, F_{l+1}]
+
+            # Attention fusion
             if l == 0:
-                h_prime = self.cat_attn_layers[l](h, self.raw_h_prime(h_prime))  # [N, embedding_output_size]
-            
+                # project raw input features for first fusion
+                h_prime = self.cat_attn_layers[l](h, self.raw_h_prime(X))  # [N, E]
             else:
                 h_prime = h_prime + self.cat_attn_layers[l](h, h_prime)
 
-        # Final projection to class logits
-        out = self.linear(h_prime)  # [N, classes]
-        
-        return out
+        # Classification
+        logits = self.linear(h_prime)
+        return logits
+
 
 
 ## For those who use fast implementation version.
