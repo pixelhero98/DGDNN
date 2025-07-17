@@ -26,7 +26,7 @@ class MyDataset(Dataset):
       - norm_eps (float, optional): epsilon added for numeric stability in z-score (default 1e-6)
 
     Graph dict entries:
-      - X: Tensor [N, F * T] node features (log1p + z-score normalized)
+      - X: Tensor [N, F * T] node features (log1p normalized)
       - A: Tensor [N, N] adjacency matrix (entropy-energy or heat-kernel)
       - Y: Tensor [N] integer labels (days price rose in window)
     """
@@ -172,11 +172,7 @@ class MyDataset(Dataset):
             # features: log1p
             W = slice_arr[:-1]
             N = W.shape[1]
-            X_raw = np.log1p(W.transpose(1,0,2).reshape(N,-1))
-            # z-score normalize
-            mean = X_raw.mean(axis=1, keepdims=True)
-            std = X_raw.std(axis=1, keepdims=True) + self.norm_eps
-            X_norm = (X_raw - mean)/std
+            X_norm = np.log1p(W.transpose(1,0,2).reshape(N,-1))
 
             # adjacency from normalized X
             A = self._adjacency(X_norm)
