@@ -21,6 +21,7 @@ com_path = [
     '/content/drive/MyDrive/.../NASDAQ.csv',
     '/content/drive/MyDrive/.../NYSE.csv',
     '/content/drive/MyDrive/.../NYSE_missing.csv',
+    '/content/drive/MyDrive/.../SSE-130-tickers.csv'
 ]
 
 des = '/content/.../data'
@@ -30,7 +31,8 @@ directory = '/content/.../google_finance'
 NASDAQ_com_list = []
 NYSE_com_list  = []
 NYSE_missing   = [] # replace with the missing tickers 
-com_lists = [NASDAQ_com_list, NYSE_com_list, NYSE_missing]
+SSE_com_list = []
+com_lists = [NASDAQ_com_list, NYSE_com_list, NYSE_missing, SSE_com_list]
 for idx, path in enumerate(com_path):
     with open(path, newline='') as f:
         reader = csv.reader(f)
