@@ -50,20 +50,8 @@ to `data/graphs/`. These generated artifacts are ignored by git.
 The old Google Drive and Dropbox data links may still be useful for historical
 reproduction, but they are no longer required for a fresh run.
 
-## Features And Graphs
+## Graphs
 
-The default feature transform is ratio return:
-
-```text
-(x_t - x_{t-1}) / max(abs(x_{t-1}), eps)
-```
-
-Use `--feature-transform log` to recover the previous `log1p(raw + eps)` path.
-The default adjacency uses continuous kNN mutual information. The optional
-positive-only post-log adjacency filter is off by default; enable it with
-`--positive-adj-filter`.
-
-Ratio features require one common trading date before the experiment start.
 The CLI downloads a small lookback buffer automatically.
 
 ## Caveats
