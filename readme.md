@@ -1,7 +1,5 @@
 # DGDNN
 
-Dynamic Graph Diffusion Neural Network for stock movement prediction.
-
 This repository can now build graph datasets from freshly fetched market data.
 By default, the training CLI fetches the current S&P 500 constituents from
 Wikipedia at runtime, normalizes the symbols for Yahoo Finance, downloads OHLCV
