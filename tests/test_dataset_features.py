@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from Data.dataset_gen import DatasetConfig, MyDataset
+from Train_Eval.next_day_movement_prediction import ExperimentConfig, build_dataset, parse_args
 
 
 TICKERS = ["AAA", "BBB", "CCC"]
@@ -21,14 +22,14 @@ def write_synthetic_csvs(root: Path, start: str = "2022-12-29") -> pd.DatetimeIn
         base = 10.0 + offset * 5.0
         rows = []
         for index, _date in enumerate(dates):
-            value = base + index
+            value = base + index * (1.0 + offset * 0.35) + (index**2) * (0.08 + offset * 0.03)
             rows.append(
                 {
                     "Open": value,
                     "High": value + 1.0,
                     "Low": value - 1.0,
                     "Close": value + 0.5,
-                    "Volume": 1000.0 + offset * 100.0 + index * 10.0,
+                    "Volume": 1000.0 + offset * 100.0 + index * 10.0 + (index**2) * (offset + 1),
                 }
             )
         frame = pd.DataFrame(rows, index=dates)
@@ -74,6 +75,46 @@ def test_ratio_is_default_and_matches_raw_arithmetic(tmp_path: Path) -> None:
     manifest_path = Path(dataset.output_directory) / "graph_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["fingerprint"]["feature_transform"] == "ratio"
+    assert manifest["fingerprint"]["adjacency_feature_transform"] == "log"
+
+
+def test_default_adjacency_uses_log_features_and_cache_invalidation(tmp_path: Path) -> None:
+    root = tmp_path / "raw"
+    dest = tmp_path / "graphs"
+    write_synthetic_csvs(root)
+
+    default_dataset = MyDataset(build_config(root, dest))
+    default_sample = default_dataset[0]
+    default_adjacency = default_sample["A"].clone()
+    dates = default_dataset._select_dates(0)  # noqa: SLF001 - verifies graph internals
+    window_array = default_dataset._collect_slice(dates)[:-1]  # noqa: SLF001
+    log_features = default_dataset._transform_features(  # noqa: SLF001
+        window_array,
+        dates[:-1],
+        "log",
+    )
+    expected_log_adjacency = default_dataset._adjacency(log_features)  # noqa: SLF001
+    np.testing.assert_allclose(default_adjacency.numpy(), expected_log_adjacency.numpy())
+
+    manifest = json.loads(
+        (Path(default_dataset.output_directory) / "graph_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["fingerprint"]["feature_transform"] == "ratio"
+    assert manifest["fingerprint"]["adjacency_feature_transform"] == "log"
+
+    ratio_ratio_dataset = MyDataset(
+        build_config(root, dest, adjacency_feature_transform="ratio")
+    )
+    ratio_ratio_adjacency = ratio_ratio_dataset[0]["A"]
+    assert not np.allclose(default_adjacency.numpy(), ratio_ratio_adjacency.numpy())
+    manifest = json.loads(
+        (Path(ratio_ratio_dataset.output_directory) / "graph_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["fingerprint"]["adjacency_feature_transform"] == "ratio"
 
 
 def test_log_feature_switch_and_cache_invalidation(tmp_path: Path) -> None:
@@ -84,7 +125,9 @@ def test_log_feature_switch_and_cache_invalidation(tmp_path: Path) -> None:
     ratio_dataset = MyDataset(build_config(root, dest))
     ratio_sample = ratio_dataset[0]["X"].clone()
 
-    log_dataset = MyDataset(build_config(root, dest, feature_transform="log"))
+    log_dataset = MyDataset(
+        build_config(root, dest, feature_transform="log", adjacency_feature_transform="log")
+    )
     log_sample = log_dataset[0]["X"]
     assert not np.allclose(ratio_sample.numpy(), log_sample.numpy())
 
@@ -97,6 +140,23 @@ def test_log_feature_switch_and_cache_invalidation(tmp_path: Path) -> None:
         (Path(log_dataset.output_directory) / "graph_manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["fingerprint"]["feature_transform"] == "log"
+    assert manifest["fingerprint"]["adjacency_feature_transform"] == "log"
+
+
+def test_default_adjacency_matches_explicit_log_log_adjacency(tmp_path: Path) -> None:
+    root = tmp_path / "raw"
+    write_synthetic_csvs(root)
+
+    default_dataset = MyDataset(build_config(root, tmp_path / "default_graphs"))
+    log_log_dataset = MyDataset(
+        build_config(
+            root,
+            tmp_path / "log_graphs",
+            feature_transform="log",
+            adjacency_feature_transform="log",
+        )
+    )
+    np.testing.assert_allclose(default_dataset[0]["A"].numpy(), log_log_dataset[0]["A"].numpy())
 
 
 def test_positive_adjacency_filter_removes_non_positive_off_diagonal(tmp_path: Path) -> None:
@@ -118,3 +178,39 @@ def test_ratio_transform_requires_lookback_rows(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="include lookback rows"):
         MyDataset(build_config(root, dest))
+
+
+def test_cli_parses_and_passes_adjacency_feature_transform(tmp_path: Path) -> None:
+    root = tmp_path / "raw"
+    dest = tmp_path / "graphs"
+    write_synthetic_csvs(root)
+
+    args = parse_args(
+        [
+            "--market",
+            MARKET,
+            "--tickers",
+            ",".join(TICKERS),
+            "--adjacency-feature-transform",
+            "ratio",
+            "--no-download",
+        ]
+    )
+    assert args.adjacency_feature_transform == "ratio"
+
+    config = ExperimentConfig(
+        root=root,
+        destination=dest,
+        market=MARKET,
+        tickers=TICKERS,
+        train_range=("2023-01-02", "2023-01-11"),
+        val_range=("2023-01-02", "2023-01-11"),
+        test_range=("2023-01-02", "2023-01-11"),
+        window=3,
+        adjacency_feature_transform=args.adjacency_feature_transform,
+    )
+    dataset = build_dataset(config, "train", config.train_range)
+    manifest = json.loads(
+        (Path(dataset.output_directory) / "graph_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["fingerprint"]["adjacency_feature_transform"] == "ratio"

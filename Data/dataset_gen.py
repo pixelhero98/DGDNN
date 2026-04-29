@@ -55,6 +55,7 @@ class DatasetConfig:
     mi_method: str = "continuous"
     mi_neighbors: Optional[int] = None
     feature_transform: str = "ratio"
+    adjacency_feature_transform: str = "log"
     positive_adj_filter: bool = False
 
     def __post_init__(self) -> None:
@@ -91,12 +92,20 @@ class DatasetConfig:
             allowed = ", ".join(sorted(VALID_FEATURE_TRANSFORMS))
             raise ValueError(f"feature_transform must be one of: {allowed}")
 
+        adjacency_feature_transform = self.adjacency_feature_transform.lower()
+        if adjacency_feature_transform not in VALID_FEATURE_TRANSFORMS:
+            allowed = ", ".join(sorted(VALID_FEATURE_TRANSFORMS))
+            raise ValueError(f"adjacency_feature_transform must be one of: {allowed}")
+
         if self.mi_neighbors is not None and self.mi_neighbors < 1:
             raise ValueError("mi_neighbors must be at least 1 when provided")
 
         object.__setattr__(self, "mode", mode)
         object.__setattr__(self, "mi_method", mi_method)
         object.__setattr__(self, "feature_transform", feature_transform)
+        object.__setattr__(
+            self, "adjacency_feature_transform", adjacency_feature_transform
+        )
 
 
 class MyDataset(Dataset[Dict[str, Tensor]]):
@@ -133,6 +142,7 @@ class MyDataset(Dataset[Dict[str, Tensor]]):
         self.mi_method = config.mi_method
         self.mi_neighbors = config.mi_neighbors
         self.feature_transform = config.feature_transform
+        self.adjacency_feature_transform = config.adjacency_feature_transform
         self.positive_adj_filter = bool(config.positive_adj_filter)
 
         if self.window <= 1:
@@ -316,6 +326,7 @@ class MyDataset(Dataset[Dict[str, Tensor]]):
             "mi_neighbors": self.mi_neighbors,
             "resolved_mi_neighbors": resolved_neighbors,
             "feature_transform": self.feature_transform,
+            "adjacency_feature_transform": self.adjacency_feature_transform,
             "positive_adj_filter": self.positive_adj_filter,
             "feature_sample_count": sample_count,
             "sparsify_threshold": self.sparsify_threshold,
@@ -418,9 +429,18 @@ class MyDataset(Dataset[Dict[str, Tensor]]):
             labels = (closes[-1] > closes[-2]).astype(np.int64)
 
             window_array = slice_array[:-1]
-            flattened = self._transform_features(window_array, dates[:-1])
+            flattened = self._transform_features(
+                window_array,
+                dates[:-1],
+                self.feature_transform,
+            )
+            adjacency_features = self._transform_features(
+                window_array,
+                dates[:-1],
+                self.adjacency_feature_transform,
+            )
 
-            adjacency = self._adjacency(flattened)
+            adjacency = self._adjacency(adjacency_features)
             features = torch.from_numpy(flattened.astype(np.float32))
 
             payload = {
@@ -431,16 +451,19 @@ class MyDataset(Dataset[Dict[str, Tensor]]):
             torch.save(payload, os.path.join(self.output_directory, f"graph_{index}.pt"))
 
     def _transform_features(
-        self, window_array: np.ndarray, window_dates: List[pd.Timestamp]
+        self,
+        window_array: np.ndarray,
+        window_dates: List[pd.Timestamp],
+        transform: str,
     ) -> np.ndarray:
-        if self.feature_transform == "log":
+        if transform == "log":
             num_nodes = window_array.shape[1]
             return np.log1p(
                 window_array.transpose(1, 0, 2).reshape(num_nodes, -1) + self.norm_eps
             )
-        if self.feature_transform == "ratio":
+        if transform == "ratio":
             return self._ratio_features(window_array, window_dates)
-        raise ValueError(f"Unsupported feature_transform: {self.feature_transform}")
+        raise ValueError(f"Unsupported feature transform: {transform}")
 
     def _ratio_features(
         self, window_array: np.ndarray, window_dates: List[pd.Timestamp]

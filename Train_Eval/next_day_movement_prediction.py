@@ -58,6 +58,7 @@ class ExperimentConfig:
     weight_decay: float = 1.5e-5
     epochs: int = 6000
     feature_transform: str = "ratio"
+    adjacency_feature_transform: str = "log"
     positive_adj_filter: bool = False
 
 
@@ -90,6 +91,7 @@ def build_dataset(config: ExperimentConfig, mode: str, date_range: Tuple[str, st
         mode=mode,
         fast_approx=config.fast_approximation,
         feature_transform=config.feature_transform,
+        adjacency_feature_transform=config.adjacency_feature_transform,
         positive_adj_filter=config.positive_adj_filter,
     )
     return MyDataset(dataset_config)
@@ -268,9 +270,12 @@ def prepare_market_data(args: argparse.Namespace) -> Tuple[str, List[str]]:
             raise ValueError("Non-SP500 markets require --tickers or --ticker-file")
         tickers = [normalize_yahoo_symbol(ticker) for ticker in requested]
 
+    needs_ratio_lookback = (
+        args.feature_transform == "ratio" or args.adjacency_feature_transform == "ratio"
+    )
     coverage_start = (
         pd.to_datetime(args.start).normalize() - pd.Timedelta(days=args.lookback_days)
-        if args.feature_transform == "ratio"
+        if needs_ratio_lookback
         else pd.to_datetime(args.start).normalize()
     ).date().isoformat()
     coverage_end = (
@@ -345,7 +350,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--feature-transform",
         choices=("ratio", "log"),
         default="ratio",
-        help="Feature transform used before graph construction",
+        help="Model node feature transform",
+    )
+    parser.add_argument(
+        "--adjacency-feature-transform",
+        choices=("ratio", "log"),
+        default="log",
+        help="Feature transform used only for adjacency construction",
     )
     parser.add_argument(
         "--positive-adj-filter",
@@ -410,6 +421,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         weight_decay=args.weight_decay,
         epochs=args.epochs,
         feature_transform=args.feature_transform,
+        adjacency_feature_transform=args.adjacency_feature_transform,
         positive_adj_filter=args.positive_adj_filter,
     )
 
@@ -419,6 +431,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     print(f"Validation: {experiment.val_range[0]} to {experiment.val_range[1]}")
     print(f"Test: {experiment.test_range[0]} to {experiment.test_range[1]}")
     print(f"Feature transform: {experiment.feature_transform}")
+    print(f"Adjacency feature transform: {experiment.adjacency_feature_transform}")
     print(f"Positive adjacency filter: {experiment.positive_adj_filter}")
 
     val_metrics, test_metrics = run_experiment(experiment)
