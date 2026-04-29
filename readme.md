@@ -47,8 +47,6 @@ to `data/graphs/`. These generated artifacts are ignored by git.
 - Unavailable Yahoo data: reported clearly; use `--drop-failed-downloads` to
   continue after failed downloads.
 
-The old Google Drive and Dropbox data links may still be useful for historical
-reproduction, but they are no longer required for a fresh run.
 
 ## Graphs
 
