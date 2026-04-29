@@ -1,0 +1,9 @@
+numpy
+pandas
+scipy
+scikit-learn
+torch
+requests
+yfinance
+lxml
+pytest
