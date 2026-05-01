@@ -1,5 +1,10 @@
 # DGDNN
 
+Official implementation for:
+
+> DGDNN: Decoupled graph diffusion neural network for stock movement prediction.
+> 16th International Conference on Agents and Artificial Intelligence.
+
 Since the old tickers might be delisted, the old data on Dropbox is missing due to storage shortage. 
 We encourage experimentation with freshly fetched financial data. This repository can now build graph datasets from freshly fetched market data.
 By default, the training CLI fetches the current S&P 500 constituents from Wikipedia at runtime, normalizes the symbols for Yahoo Finance, downloads OHLCV data with `yfinance`, and trains on all current S&P 500 tickers unless a ticker subset is provided. 
